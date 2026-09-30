@@ -55,3 +55,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Supabase CLI temporary files
+supabase/.temp/
