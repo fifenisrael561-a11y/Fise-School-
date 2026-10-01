@@ -1,0 +1,355 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/services/private_message_service.dart';
+import '../../../models/private_message.dart';
+import '../../../models/user_profile.dart';
+import '../../../core/services/photo_service.dart';
+
+class PrivateMessagesPage extends StatefulWidget {
+  final Locale locale;
+  final UserProfile profile;
+
+  const PrivateMessagesPage({
+    super.key,
+    required this.locale,
+    required this.profile,
+  });
+
+  @override
+  State<PrivateMessagesPage> createState() => _PrivateMessagesPageState();
+}
+
+class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
+  final _service = PrivateMessageService();
+  final _composer = TextEditingController();
+  late Future<List<MessageContact>> _contactsFuture;
+  MessageContact? _selected;
+  List<PrivateMessage> _messages = const [];
+  bool _loadingMessages = false;
+  bool _sending = false;
+  PickedAttachment? _attachment;
+  final PhotoService _photoService = PhotoService();
+
+  bool get _isFrench => widget.locale.languageCode == 'fr';
+
+  @override
+  void initState() {
+    super.initState();
+    _contactsFuture = _service.listContacts();
+  }
+
+  @override
+  void dispose() {
+    _composer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _select(MessageContact contact) async {
+    setState(() {
+      _selected = contact;
+      _loadingMessages = true;
+    });
+    try {
+      final messages = await _service.listConversation(contact.id);
+      await _service.markConversationRead(contact.id);
+      if (mounted) setState(() => _messages = messages);
+    } finally {
+      if (mounted) setState(() => _loadingMessages = false);
+    }
+  }
+
+  Future<void> _send() async {
+    final contact = _selected;
+    final body = _composer.text.trim();
+    if (contact == null || _sending) return;
+    if (body.isEmpty && _attachment == null) return;
+
+    setState(() => _sending = true);
+    try {
+      await _service.send(
+        recipientId: contact.id,
+        body: body,
+        attachmentBytes: _attachment?.bytes,
+        attachmentName: _attachment?.name,
+        attachmentType: _attachment?.mimeType,
+      );
+      _composer.clear();
+      if (mounted) setState(() => _attachment = null);
+      await _select(contact);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    final file = await _photoService.takePhoto();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _attachment = PickedAttachment(
+        bytes: bytes,
+        name: 'photo-${DateTime.now().millisecondsSinceEpoch}.jpg',
+        mimeType: 'image/jpeg',
+      );
+    });
+  }
+
+  Future<void> _pickAttachment() async {
+    final attachment = await _photoService.pickFile(
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'mp4', 'mp3', 'm4a'],
+    );
+    if (attachment != null && mounted) setState(() => _attachment = attachment);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _isFrench ? 'Messagerie privée' : 'Private messages';
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: FutureBuilder<List<MessageContact>>(
+        future: _contactsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('${snapshot.error}'));
+          }
+          final contacts = snapshot.data ?? const <MessageContact>[];
+          if (contacts.isEmpty) {
+            return Center(
+              child: Text(
+                _isFrench
+                    ? 'Aucun contact disponible dans votre classe.'
+                    : 'No contact is available in your class.',
+              ),
+            );
+          }
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 700;
+              final list = _contacts(contacts);
+              final conversation = _conversation();
+              return wide
+                  ? Row(
+                      children: [
+                        SizedBox(width: 280, child: list),
+                        conversation,
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        SizedBox(height: 190, child: list),
+                        conversation,
+                      ],
+                    );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _contacts(List<MessageContact> contacts) {
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: ListView.builder(
+        itemCount: contacts.length,
+        itemBuilder: (context, index) {
+          final contact = contacts[index];
+          final selected = contact.id == _selected?.id;
+          return ListTile(
+            selected: selected,
+            leading: CircleAvatar(
+              child: Text(
+                contact.firstName.isEmpty
+                    ? '?'
+                    : contact.firstName.substring(0, 1),
+              ),
+            ),
+            title: Text(contact.fullName),
+            subtitle: Text(
+              contact.role == 'teacher'
+                  ? (_isFrench ? 'Enseignant' : 'Teacher')
+                  : (_isFrench ? 'Élève' : 'Student'),
+            ),
+            onTap: () => _select(contact),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _conversation() {
+    final contact = _selected;
+    if (contact == null) {
+      return Expanded(
+        child: Center(
+          child: Text(
+            _isFrench ? 'Sélectionnez un contact.' : 'Select a contact.',
+          ),
+        ),
+      );
+    }
+    return Expanded(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(contact.fullName),
+            subtitle: Text(contact.className ?? ''),
+          ),
+          Expanded(
+            child: _loadingMessages
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      final mine = message.senderId == widget.profile.id;
+                      return Align(
+                        alignment: mine
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          decoration: BoxDecoration(
+                            color: mine
+                                ? const Color(0xFFDCFCE7)
+                                : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (message.body.isNotEmpty) Text(message.body),
+                              if (message.attachmentPath != null)
+                                _MessageAttachment(
+                                  service: _service,
+                                  message: message,
+                                  isFrench: _isFrench,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: _isFrench ? 'Prendre une photo' : 'Take a photo',
+                  onPressed: _sending ? null : _takePhoto,
+                  icon: const Icon(Icons.camera_alt_rounded),
+                ),
+                IconButton(
+                  tooltip: _isFrench ? 'Joindre un fichier' : 'Attach a file',
+                  onPressed: _sending ? null : _pickAttachment,
+                  icon: const Icon(Icons.attach_file_rounded),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _composer,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: _attachment != null
+                          ? (_isFrench
+                              ? 'Pièce jointe : ${_attachment!.name}'
+                              : 'Attachment: ${_attachment!.name}')
+                          : (_isFrench
+                              ? 'Écrire un message...'
+                              : 'Write a message...'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  tooltip: _isFrench ? 'Envoyer' : 'Send',
+                  onPressed: _sending ? null : _send,
+                  icon: _sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_rounded),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _MessageAttachment extends StatelessWidget {
+  final PrivateMessageService service;
+  final PrivateMessage message;
+  final bool isFrench;
+
+  const _MessageAttachment({
+    required this.service,
+    required this.message,
+    required this.isFrench,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: service.signedAttachmentUrl(message.attachmentPath),
+      builder: (context, snapshot) {
+        final url = snapshot.data;
+        final type = message.attachmentType ?? '';
+        if (url == null) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              message.attachmentName ?? (isFrench ? 'Pièce jointe' : 'Attachment'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          );
+        }
+        if (type.startsWith('image/')) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                url,
+                width: 220,
+                height: 180,
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextButton.icon(
+            onPressed: () async {
+              final uri = Uri.tryParse(url);
+              if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            icon: const Icon(Icons.attach_file_rounded),
+            label: Text(message.attachmentName ?? (isFrench ? 'Fichier' : 'File')),
+          ),
+        );
+      },
+    );
+  }
+}
