@@ -33,6 +33,7 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
   final _scoreController = TextEditingController(text: '20');
 
   final CourseService _courseService = CourseService();
+  final LessonService _lessonService = LessonService();
   late Future<List<SchoolClass>> _classesFuture;
   List<Course> _courses = const [];
   List<Lesson> _lessons = const [];
@@ -180,7 +181,7 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
       _lessons = const [];
     });
     if (value == null) return;
-    final lessons = await _courseService.listAllLessons(value.id);
+    final lessons = await _lessonService.listAllLessons(value.id);
     if (!mounted) return;
     setState(() { _lessons = lessons; });
   }

@@ -41,11 +41,11 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
   }
 
   String _time(TimeOfDay t) => '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}:00';
-  String _day(int d) => (fr ? const ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'] : const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'])[d-1];
+  String _dayName(int d) => (fr ? const ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'] : const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'])[d-1];
 
   Future<void> _pickTime(bool start) async {
     final picked = await showTimePicker(context: context, initialTime: start ? _start : _end);
-    if (picked != null && mounted) setState(() { if (start) _start = picked; else _end = picked; });
+    if (picked != null && mounted) setState(() { if (start) { _start = picked; } else { _end = picked; } });
   }
 
   Future<void> _save() async {
@@ -77,7 +77,7 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(initialValue: _teacherId, decoration: InputDecoration(labelText: fr ? 'Enseignant' : 'Teacher'), items: [DropdownMenuItem<String>(value: null, child: Text(fr ? 'Aucun' : 'None')), ..._teachers.map((t) => DropdownMenuItem(value: t['id'].toString(), child: Text('${t['first_name'] ?? ''} ${t['last_name'] ?? ''}'.trim())))], onChanged: (v) => setState(() => _teacherId = v)),
           const SizedBox(height: 12),
-          DropdownButtonFormField<int>(initialValue: _day, decoration: InputDecoration(labelText: fr ? 'Jour' : 'Day'), items: List.generate(6, (i) => DropdownMenuItem(value: i+1, child: Text(_day(i+1)))), onChanged: (v) => setState(() => _day = v ?? 1)),
+          DropdownButtonFormField<int>(initialValue: _day, decoration: InputDecoration(labelText: fr ? 'Jour' : 'Day'), items: List.generate(6, (i) => DropdownMenuItem(value: i+1, child: Text(_dayName(i+1)))), onChanged: (v) => setState(() => _day = v ?? 1)),
           const SizedBox(height: 12),
           Row(children: [Expanded(child: OutlinedButton(onPressed: () => _pickTime(true), child: Text('${fr ? 'Début' : 'Start'} ${_start.format(context)}'))), const SizedBox(width: 8), Expanded(child: OutlinedButton(onPressed: () => _pickTime(false), child: Text('${fr ? 'Fin' : 'End'} ${_end.format(context)}')))]),
           const SizedBox(height: 12),
@@ -88,7 +88,7 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
           Text(fr ? 'Créneaux de la salle' : 'Class timetable', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           if (_entries.isEmpty) Text(fr ? 'Aucun créneau.' : 'No timetable slots.'),
-          ..._entries.map((e) => Card(child: ListTile(title: Text('${_day(e.dayOfWeek)} · ${e.startTime}–${e.endTime}'), subtitle: Text('${e.subject}${e.teacherName == null ? '' : ' · ${e.teacherName}'}${e.room == null || e.room!.isEmpty ? '' : ' · ${e.room}'}'), trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () async { await _timetable.delete(e.id); if (_classId != null) _loadClass(_classId!); })))),
+          ..._entries.map((e) => Card(child: ListTile(title: Text('${_dayName(e.dayOfWeek)} · ${e.startTime}–${e.endTime}'), subtitle: Text('${e.subject}${e.teacherName == null ? '' : ' · ${e.teacherName}'}${e.room == null || e.room!.isEmpty ? '' : ' · ${e.room}'}'), trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () async { await _timetable.delete(e.id); if (_classId != null) _loadClass(_classId!); })))),
         ],
       ]);
     }),

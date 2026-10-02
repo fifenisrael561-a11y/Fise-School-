@@ -73,7 +73,7 @@ class _ForumPageState extends State<ForumPage> {
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<ForumClass>(
-                value: selected,
+                initialValue: selected,
                 decoration: InputDecoration(
                   labelText: _isFrench ? 'Salle de classe' : 'Classroom',
                   border: const OutlineInputBorder(),

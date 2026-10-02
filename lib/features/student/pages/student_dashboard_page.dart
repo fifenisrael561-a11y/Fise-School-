@@ -468,20 +468,7 @@ class _Welcome extends StatelessWidget {
 }
 
 // ============================================================================
-// CHIP
-// ============================================================================
 
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoChip(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(label: Text('$label: $value'));
-  }
-}
 
 // ============================================================================
 // GRILLE DU DASHBOARD

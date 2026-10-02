@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -158,14 +157,14 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                     Text(_fr ? 'Créer un contenu pédagogique' : 'Create educational content', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<Map<String, dynamic>>(
-                      value: selectedClass,
+                      initialValue: selectedClass,
                       decoration: InputDecoration(labelText: _fr ? 'Salle de classe' : 'Classroom'),
                       items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c['display_name']?.toString() ?? c['name']?.toString() ?? ''))).toList(),
                       onChanged: saving ? null : (value) async { selectedClass = value; await loadSubjects(setDialog); },
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Map<String, dynamic>>(
-                      value: selectedSubject,
+                      initialValue: selectedSubject,
                       decoration: InputDecoration(labelText: _fr ? 'Matière de cette salle' : 'Subject in this classroom'),
                       items: subjects.map((s) { final m = Map<String, dynamic>.from(s['subjects'] as Map); return DropdownMenuItem(value: m, child: Text(_nestedName(m, 'name_fr', 'name_en'))); }).toList(),
                       onChanged: saving ? null : (value) async {
@@ -176,14 +175,14 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Map<String, dynamic>>(
-                      value: selectedCurriculum,
+                      initialValue: selectedCurriculum,
                       decoration: InputDecoration(labelText: _fr ? 'Programme' : 'Curriculum'),
                       items: curricula.map((c) => DropdownMenuItem(value: c, child: Text(_nestedName(c, 'title_fr', 'title_en')))).toList(),
                       onChanged: saving ? null : (value) async { selectedCurriculum = value; selectedChapter = null; chapters = value == null ? [] : List<Map<String, dynamic>>.from(await _client.from('course_chapters').select().eq('curriculum_id', value['id']).eq('is_active', true).order('position')); selectedChapter = chapters.isEmpty ? null : chapters.first; setDialog(() {}); },
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Map<String, dynamic>>(
-                      value: selectedChapter,
+                      initialValue: selectedChapter,
                       decoration: InputDecoration(labelText: _fr ? 'Chapitre' : 'Chapter'),
                       items: chapters.map((c) => DropdownMenuItem(value: c, child: Text(_nestedName(c, 'title_fr', 'title_en')))).toList(),
                       onChanged: saving ? null : (value) => setDialog(() => selectedChapter = value),
@@ -266,7 +265,7 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     final type = switch (ext) { 'pdf' => 'pdf', 'jpg' || 'jpeg' || 'png' || 'webp' => 'image', 'mp4' || 'mov' => 'video', 'mp3' || 'wav' || 'm4a' => 'audio', 'doc' || 'docx' || 'txt' || 'ppt' || 'pptx' || 'xls' || 'xlsx' => 'document', _ => 'other' };
     try {
       final count = await _client.from('course_resources').select('id').eq('course_id', course['id']).count(CountOption.exact);
-      await _resources.uploadResource(courseId: course['id'].toString(), file: file, resourceType: type, position: count.count ?? 0, titleFr: file.name, titleEn: file.name);
+      await _resources.uploadResource(courseId: course['id'].toString(), file: file, resourceType: type, position: count.count, titleFr: file.name, titleEn: file.name);
       _snack(_fr ? 'Contenu ajouté à la salle et au cours.' : 'Content added to the classroom course.');
     } catch (e) { _snack(_fr ? 'Échec de l’envoi : $e' : 'Upload failed: $e'); }
   }
