@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'profile_service.dart';
+import '../offline/local_cleanup.dart';
 
 class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
@@ -63,27 +64,22 @@ class AuthService {
 
     final user = response.user;
     if (user != null && response.session != null) {
-      // Le profil est déjà créé par le déclencheur Supabase. Cette mise à jour
-      // ne fait que compléter les informations : si elle échoue, le compte
-      // existe quand même et ne doit pas apparaître comme « non créé ».
-      try {
-        await _profileService.saveCurrentProfile(
-          firstName: firstName,
-          lastName: lastName,
-          email: cleanEmail,
-          role: role,
-          subsystem: subsystem,
-          sector: sector,
-          examLevelId: examLevelId,
-          examId: examId,
-          seriesId: seriesId,
-          specialtyId: specialtyId,
-          examLevel: examLevel,
-          exam: exam,
-          track: track,
-          className: className,
-        );
-      } catch (_) {}
+      await _profileService.saveCurrentProfile(
+        firstName: firstName,
+        lastName: lastName,
+        email: cleanEmail,
+        role: role,
+        subsystem: subsystem,
+        sector: sector,
+        examLevelId: examLevelId,
+        examId: examId,
+        seriesId: seriesId,
+        specialtyId: specialtyId,
+        examLevel: examLevel,
+        exam: exam,
+        track: track,
+        className: className,
+      );
     }
 
     return response.session != null;
@@ -115,5 +111,8 @@ class AuthService {
     );
   }
 
-  Future<void> signOut() => _client.auth.signOut();
+  Future<void> signOut() async {
+    await clearLocalUserData();
+    await _client.auth.signOut();
+  }
 }

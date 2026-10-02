@@ -135,17 +135,17 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${texts.subsystem}: ${widget.profile.subsystem ?? texts.temporaryData}',
+            '${texts.subsystem}: ${widget.profile.subsystem ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}',
           ),
           Text(
-            '${texts.sector}: ${widget.profile.sector ?? texts.temporaryData}',
+            '${texts.sector}: ${widget.profile.sector ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}',
           ),
           Text(
-            '${texts.examLevel}: ${widget.profile.examLevel ?? texts.temporaryData}',
+            '${texts.examLevel}: ${widget.profile.examLevel ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}',
           ),
-          Text('${texts.exam}: ${widget.profile.exam ?? texts.temporaryData}'),
+          Text('${texts.exam}: ${widget.profile.exam ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}'),
           Text(
-            '${texts.schoolClass}: ${widget.profile.className ?? texts.temporaryData}',
+            '${texts.schoolClass}: ${widget.profile.className ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}',
           ),
         ],
       ),

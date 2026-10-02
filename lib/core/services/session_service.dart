@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/user_profile.dart';
+import '../offline/json_cache.dart';
+import '../offline/local_cleanup.dart';
 import 'profile_service.dart';
+import 'push_service.dart';
 
 enum SessionStatus { loading, signedOut, authenticated, profileMissing, error }
 
@@ -56,19 +59,50 @@ class SupabaseSessionService implements SessionService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
+  static const String _profileCacheKey = 'session_profile';
+
   @override
   Future<SessionState> load() async {
     try {
       final session = _client.auth.currentSession;
       if (session == null) return const SessionState.signedOut();
 
-      final profile = await _fetchProfile();
-      if (profile == null) return const SessionState.profileMissing();
-      return SessionState.authenticated(profile);
+      try {
+        final profile = await _fetchProfile().timeout(
+          JsonCache.networkTimeout * 2,
+        );
+        if (profile == null) return const SessionState.profileMissing();
+        await _cacheProfile(profile);
+        return SessionState.authenticated(profile);
+      } catch (_) {
+        // Hors ligne (ou serveur injoignable) : la session locale reste
+        // valable, on reprend le dernier profil connu pour ouvrir l'app.
+        final cached = await _cachedProfile(session.user.id);
+        if (cached != null) return SessionState.authenticated(cached);
+        rethrow;
+      }
     } on AuthException catch (error) {
       return SessionState.error(error.message);
     } catch (error) {
       return SessionState.error(error.toString());
+    }
+  }
+
+  Future<void> _cacheProfile(UserProfile profile) async {
+    try {
+      await JsonCache.instance.write(_profileCacheKey, profile.toMap());
+    } catch (_) {}
+  }
+
+  Future<UserProfile?> _cachedProfile(String userId) async {
+    final raw = await JsonCache.instance.read(_profileCacheKey);
+    if (raw is! Map) return null;
+    try {
+      final profile = UserProfile.fromMap(Map<String, dynamic>.from(raw));
+      // Ne jamais reprendre le profil d'un autre compte.
+      return profile.id == userId ? profile : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -117,5 +151,11 @@ class SupabaseSessionService implements SessionService {
   }
 
   @override
-  Future<void> signOut() => _client.auth.signOut();
+  Future<void> signOut() async {
+    await PushService.unregister();
+    // Envoie d'abord la progression faite hors ligne (si possible), puis
+    // efface toutes les données locales du compte.
+    await clearLocalUserData();
+    await _client.auth.signOut();
+  }
 }

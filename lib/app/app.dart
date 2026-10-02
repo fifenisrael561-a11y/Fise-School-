@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/offline/offline_banner.dart';
+import '../core/services/push_service.dart';
 import '../core/services/session_service.dart';
 import '../features/auth/widgets/auth_gate.dart';
 import '../supabase_config.dart';
@@ -58,9 +60,14 @@ class _FiseSchoolAppState extends State<FiseSchoolApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: fiseMessengerKey,
       title: 'Fise School',
       locale: _locale,
       theme: FiseSchoolTheme.light(),
+      builder: (context, child) => OfflineAwareShell(
+        languageCode: _locale.languageCode,
+        child: child ?? const SizedBox.shrink(),
+      ),
       routes: FiseSchoolRoutes.publicRoutes(
         locale: _locale,
         onLanguageChanged: _changeLanguage,

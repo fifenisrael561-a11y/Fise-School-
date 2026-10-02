@@ -151,8 +151,8 @@ class AppTexts {
   String get students => isEnglish ? 'Students' : 'Élèves';
   String get teachers => isEnglish ? 'Teachers' : 'Enseignants';
   String get adminComingSoon => isEnglish
-      ? 'Management interface coming soon.'
-      : 'Interface de gestion à venir.';
+      ? 'Management module is being prepared.'
+      : 'Le module de gestion est en préparation.';
   String get reviewPromotions =>
       isEnglish ? 'Review requests' : 'Revoir les demandes';
   String get adminLoadError => isEnglish
@@ -196,8 +196,6 @@ class AppTexts {
   String get accessDenied => isEnglish
       ? 'This account has no available space yet.'
       : 'Cet espace n’est pas encore disponible pour ce compte.';
-  String get temporaryData =>
-      isEnglish ? 'Temporary data' : 'Données temporaires';
   String get welcomeBack =>
       isEnglish ? 'Your school overview' : 'Votre aperçu scolaire';
   String get comingSoon => isEnglish

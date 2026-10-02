@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/pedagogy.dart';
 import '../../models/school_class.dart';
 import '../../models/user_profile.dart';
+import '../offline/json_cache.dart';
+import '../offline/offline_repository.dart';
+import '../offline/pending_progress.dart';
 
 class SubjectService {
   final SupabaseClient _client;
@@ -41,6 +44,14 @@ class CourseService {
   Future<List<ClassSubjectEntry>> listClassSubjects(UserProfile profile) async {
     if (profile.subsystem == null || profile.sector == null) return const [];
 
+    return JsonCache.instance.cachedRead<List<ClassSubjectEntry>>(
+      key: 'class_subjects_${profile.id}',
+      fetch: () => _fetchClassSubjectRows(profile),
+      decode: (raw) => _decodeClassSubjects(profile, raw),
+    );
+  }
+
+  Future<List<dynamic>> _fetchClassSubjectRows(UserProfile profile) async {
     // The student's active class is the source of truth. This prevents a
     // Francophone student from seeing Anglophone classes/subjects and vice versa.
     final memberships = await _client
@@ -58,20 +69,30 @@ class CourseService {
         classIds.add(row['class_id'] as String);
       }
     }
-    if (classIds.isEmpty) return const [];
+    if (classIds.isEmpty) return const <dynamic>[];
 
-    final rows = await _client
+    return await _client
         .from('class_subjects')
         .select('subject_id, is_compulsory, option_group, position, subjects(*)')
         .inFilter('class_id', classIds)
         .eq('is_active', true)
         .order('position');
+  }
 
+  List<ClassSubjectEntry> _decodeClassSubjects(
+    UserProfile profile,
+    Object? raw,
+  ) {
     final seen = <String>{};
     final result = <ClassSubjectEntry>[];
-    for (final row in rows) {
-      final entry = ClassSubjectEntry.fromMap(Map<String, dynamic>.from(row));
-      if (entry.subject.subsystem.name != profile.subsystem || entry.subject.sector.name != profile.sector) continue;
+    for (final row in (raw as List)) {
+      final entry = ClassSubjectEntry.fromMap(
+        Map<String, dynamic>.from(row as Map),
+      );
+      if (entry.subject.subsystem.name != profile.subsystem ||
+          entry.subject.sector.name != profile.sector) {
+        continue;
+      }
       if (seen.add(entry.subject.id)) result.add(entry);
     }
     return result;
@@ -81,6 +102,21 @@ class CourseService {
     final entries = await listClassSubjects(profile);
     if (entries.isNotEmpty) return entries.map((e) => e.subject).toList(growable: false);
     return SubjectService(client: _client).listForProfile(profile);
+  }
+
+  /// Subjects explicitly assigned to one classroom. Teachers use this when
+  /// creating content so a subject can never silently come from another room.
+  Future<List<Subject>> listSubjectsForClass(String classId) async {
+    final rows = await _client
+        .from('class_subjects')
+        .select('subject_id, is_compulsory, option_group, position, subjects(*)')
+        .eq('class_id', classId)
+        .eq('is_active', true)
+        .order('position');
+
+    return rows
+        .map((row) => ClassSubjectEntry.fromMap(Map<String, dynamic>.from(row)).subject)
+        .toList(growable: false);
   }
 
   Future<List<Curriculum>> listCurricula(String subjectId) async {
@@ -113,54 +149,83 @@ class CourseService {
     String studentId, {
     String? subjectId,
   }) async {
-    final memberships = await _client
-        .from('class_students')
-        .select('class_id')
-        .eq('student_id', studentId)
-        .eq('is_active', true);
+    try {
+      final memberships = await _client
+          .from('class_students')
+          .select('class_id')
+          .eq('student_id', studentId)
+          .eq('is_active', true)
+          .timeout(JsonCache.networkTimeout);
 
-    final classIds = memberships
-        .map((row) => row['class_id'] as String)
-        .toList(growable: false);
+      final classIds = memberships
+          .map((row) => row['class_id'] as String)
+          .toList(growable: false);
 
-    if (classIds.isEmpty) {
-      return const [];
+      if (classIds.isEmpty) return const [];
+
+      dynamic request = _client
+          .from('courses')
+          .select()
+          .eq('status', 'published')
+          .inFilter('class_id', classIds);
+
+      if (subjectId != null) request = request.eq('subject_id', subjectId);
+
+      final rows = await request
+          .order('updated_at', ascending: false)
+          .timeout(JsonCache.networkTimeout);
+      final courses = rows
+          .map((row) => Course.fromMap(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+
+      if (subjectId == null) {
+        await OfflineRepository().replaceCourses(courses);
+      } else {
+        await OfflineRepository().saveCourses(courses);
+      }
+      return courses;
+    } catch (_) {
+      final cached = await OfflineRepository().getCoursesForStudent(studentId);
+      if (subjectId == null) return cached;
+      return cached.where((course) => course.subjectId == subjectId).toList(growable: false);
     }
-
-    dynamic request = _client
-        .from('courses')
-        .select()
-        .eq('status', 'published')
-        .inFilter('class_id', classIds);
-
-    if (subjectId != null) {
-      request = request.eq('subject_id', subjectId);
-    }
-
-    final rows = await request.order('updated_at', ascending: false);
-
-    return rows
-        .map((row) => Course.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
   }
 
   Future<Course> getCourse(String id) async {
-    final row = await _client.from('courses').select().eq('id', id).single();
-
-    return Course.fromMap(Map<String, dynamic>.from(row));
+    try {
+      final row = await _client
+          .from('courses')
+          .select()
+          .eq('id', id)
+          .single()
+          .timeout(JsonCache.networkTimeout);
+      final course = Course.fromMap(Map<String, dynamic>.from(row));
+      await OfflineRepository().saveCourse(course);
+      return course;
+    } catch (_) {
+      final cached = await OfflineRepository().getCourse(id);
+      if (cached == null) rethrow;
+      return cached;
+    }
   }
 
   Future<List<Lesson>> listLessons(String courseId) async {
-    final rows = await _client
-        .from('lessons')
-        .select()
-        .eq('course_id', courseId)
-        .eq('is_published', true)
-        .order('position');
-
-    return rows
-        .map((row) => Lesson.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+    try {
+      final rows = await _client
+          .from('lessons')
+          .select()
+          .eq('course_id', courseId)
+          .eq('is_published', true)
+          .order('position')
+          .timeout(JsonCache.networkTimeout);
+      final lessons = rows
+          .map((row) => Lesson.fromMap(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+      await OfflineRepository().saveLessons(lessons);
+      return lessons;
+    } catch (_) {
+      return OfflineRepository().getLessonsForCourse(courseId);
+    }
   }
 
   Future<List<Course>> listTeacherCourses(
@@ -256,22 +321,40 @@ class LessonService {
     : _client = client ?? Supabase.instance.client;
 
   Future<Lesson> getLesson(String id) async {
-    final row = await _client.from('lessons').select().eq('id', id).single();
-
-    return Lesson.fromMap(Map<String, dynamic>.from(row));
+    try {
+      final row = await _client
+          .from('lessons')
+          .select()
+          .eq('id', id)
+          .single()
+          .timeout(JsonCache.networkTimeout);
+      final lesson = Lesson.fromMap(Map<String, dynamic>.from(row));
+      await OfflineRepository().saveLesson(lesson);
+      return lesson;
+    } catch (_) {
+      final cached = await OfflineRepository().getLesson(id);
+      if (cached == null) rethrow;
+      return cached;
+    }
   }
 
   Future<List<Lesson>> listLessons(String courseId) async {
-    final rows = await _client
-        .from('lessons')
-        .select()
-        .eq('course_id', courseId)
-        .eq('is_published', true)
-        .order('position');
-
-    return rows
-        .map((row) => Lesson.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+    try {
+      final rows = await _client
+          .from('lessons')
+          .select()
+          .eq('course_id', courseId)
+          .eq('is_published', true)
+          .order('position')
+          .timeout(JsonCache.networkTimeout);
+      final lessons = rows
+          .map((row) => Lesson.fromMap(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+      await OfflineRepository().saveLessons(lessons);
+      return lessons;
+    } catch (_) {
+      return OfflineRepository().getLessonsForCourse(courseId);
+    }
   }
 
   Future<List<Lesson>> listCourseLessons(String courseId) {
@@ -349,19 +432,56 @@ class ProgressService {
   ProgressService({SupabaseClient? client})
     : _client = client ?? Supabase.instance.client;
 
-  Future<LessonProgress?> get(String studentId, String lessonId) async {
-    final row = await _client
-        .from('lesson_progress')
-        .select()
-        .eq('student_id', studentId)
-        .eq('lesson_id', lessonId)
-        .maybeSingle();
+  String _cacheKey(String studentId, String lessonId) =>
+      'progress_${studentId}_$lessonId';
 
-    if (row == null) {
+  /// Lecture de la progression : serveur d'abord, copie locale sinon.
+  Future<LessonProgress?> get(String studentId, String lessonId) async {
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .select()
+          .eq('student_id', studentId)
+          .eq('lesson_id', lessonId)
+          .maybeSingle()
+          .timeout(JsonCache.networkTimeout);
+
+      if (row == null) {
+        return await _local(studentId, lessonId);
+      }
+
+      final map = Map<String, dynamic>.from(row);
+      try {
+        await JsonCache.instance.write(_cacheKey(studentId, lessonId), map);
+      } catch (_) {}
+      return LessonProgress.fromMap(map);
+    } catch (_) {
+      return _local(studentId, lessonId);
+    }
+  }
+
+  Future<LessonProgress?> _local(String studentId, String lessonId) async {
+    final raw = await JsonCache.instance.read(_cacheKey(studentId, lessonId));
+    if (raw is! Map) return null;
+    try {
+      return LessonProgress.fromMap(Map<String, dynamic>.from(raw));
+    } catch (_) {
       return null;
     }
+  }
 
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
+  /// Enregistre l'état localement et le met en file d'attente d'envoi.
+  Future<LessonProgress> _saveOffline(Map<String, dynamic> values) async {
+    final studentId = values['student_id'] as String;
+    final lessonId = values['lesson_id'] as String;
+    final local = <String, dynamic>{
+      'id': 'local:$studentId:$lessonId',
+      ...values,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    await JsonCache.instance.write(_cacheKey(studentId, lessonId), local);
+    await PendingProgress.instance.enqueue(values);
+    return LessonProgress.fromMap(local);
   }
 
   Future<LessonProgress> open({
@@ -381,13 +501,24 @@ class ProgressService {
       'completed_at': existing?.completedAt?.toIso8601String(),
     };
 
-    final row = await _client
-        .from('lesson_progress')
-        .upsert(values, onConflict: 'student_id,lesson_id')
-        .select()
-        .single();
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .upsert(values, onConflict: 'student_id,lesson_id')
+          .select()
+          .single()
+          .timeout(JsonCache.networkTimeout);
 
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
+      final map = Map<String, dynamic>.from(row);
+      try {
+        await JsonCache.instance.write(_cacheKey(studentId, lessonId), map);
+      } catch (_) {}
+      return LessonProgress.fromMap(map);
+    } catch (_) {
+      // Hors ligne : la leçon s'ouvre quand même, la progression sera
+      // envoyée plus tard.
+      return _saveOffline(values);
+    }
   }
 
   Future<LessonProgress> complete({
@@ -407,13 +538,22 @@ class ProgressService {
       'completed_at': now,
     };
 
-    final row = await _client
-        .from('lesson_progress')
-        .upsert(values, onConflict: 'student_id,lesson_id')
-        .select()
-        .single();
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .upsert(values, onConflict: 'student_id,lesson_id')
+          .select()
+          .single()
+          .timeout(JsonCache.networkTimeout);
 
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
+      final map = Map<String, dynamic>.from(row);
+      try {
+        await JsonCache.instance.write(_cacheKey(studentId, lessonId), map);
+      } catch (_) {}
+      return LessonProgress.fromMap(map);
+    } catch (_) {
+      return _saveOffline(values);
+    }
   }
 }
 
@@ -425,27 +565,33 @@ class ResourceService {
 
   static const String bucket = 'course-resources';
 
-  Future<List<CourseResource>> listForCourse(String courseId) async {
-    final rows = await _client
-        .from('course_resources')
-        .select()
-        .eq('course_id', courseId)
-        .order('position');
-
-    return rows
-        .map((row) => CourseResource.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+  Future<List<CourseResource>> listForCourse(String courseId) {
+    return JsonCache.instance.cachedRead<List<CourseResource>>(
+      key: 'resources_course_$courseId',
+      fetch: () => _client
+          .from('course_resources')
+          .select()
+          .eq('course_id', courseId)
+          .order('position'),
+      decode: _decodeResources,
+    );
   }
 
-  Future<List<CourseResource>> listForLesson(String lessonId) async {
-    final rows = await _client
-        .from('course_resources')
-        .select()
-        .eq('lesson_id', lessonId)
-        .order('position');
+  Future<List<CourseResource>> listForLesson(String lessonId) {
+    return JsonCache.instance.cachedRead<List<CourseResource>>(
+      key: 'resources_lesson_$lessonId',
+      fetch: () => _client
+          .from('course_resources')
+          .select()
+          .eq('lesson_id', lessonId)
+          .order('position'),
+      decode: _decodeResources,
+    );
+  }
 
-    return rows
-        .map((row) => CourseResource.fromMap(Map<String, dynamic>.from(row)))
+  List<CourseResource> _decodeResources(Object? raw) {
+    return (raw as List)
+        .map((row) => CourseResource.fromMap(Map<String, dynamic>.from(row as Map)))
         .toList(growable: false);
   }
 
@@ -507,7 +653,7 @@ class ResourceService {
           .single();
 
       return CourseResource.fromMap(Map<String, dynamic>.from(row));
-    } catch (error) {
+    } catch (_) {
       try {
         await _client.storage.from(bucket).remove([storagePath]);
       } catch (_) {

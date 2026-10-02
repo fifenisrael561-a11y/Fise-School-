@@ -34,7 +34,13 @@ class _TeacherPaymentCodePageState extends State<TeacherPaymentCodePage> {
       if (existing != null && existing['active'] == true) {
         _code = existing['code']?.toString();
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible de charger le code de paiement. Réessayez plus tard.')),
+        );
+      }
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -43,7 +49,7 @@ class _TeacherPaymentCodePageState extends State<TeacherPaymentCodePage> {
     try {
       final code = await _service.createOrGetCode();
       if (mounted) setState(() => _code = code);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_fr ? 'Impossible de créer le code.' : 'Unable to create the code.')),

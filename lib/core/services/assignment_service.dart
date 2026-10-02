@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/assignment.dart';
+import '../offline/json_cache.dart';
 
 class AssignmentService {
   final SupabaseClient _client;
@@ -9,6 +10,24 @@ class AssignmentService {
     : _client = client ?? Supabase.instance.client;
 
   Future<List<Assignment>> listStudentAssignments({
+    required String studentId,
+    String? courseId,
+    String? lessonId,
+  }) {
+    return JsonCache.instance.cachedRead<List<Assignment>>(
+      key: 'assignments_${studentId}_${courseId ?? 'all'}_${lessonId ?? 'all'}',
+      fetch: () => _fetchStudentAssignmentRows(
+        studentId: studentId,
+        courseId: courseId,
+        lessonId: lessonId,
+      ),
+      decode: (raw) => (raw as List)
+          .map((row) => Assignment.fromMap(Map<String, dynamic>.from(row as Map)))
+          .toList(growable: false),
+    );
+  }
+
+  Future<List<dynamic>> _fetchStudentAssignmentRows({
     required String studentId,
     String? courseId,
     String? lessonId,
@@ -25,7 +44,7 @@ class AssignmentService {
         .toList(growable: false);
 
     if (classIds.isEmpty) {
-      return const [];
+      return const <dynamic>[];
     }
 
     var request = _client
@@ -42,35 +61,34 @@ class AssignmentService {
       request = request.eq('lesson_id', lessonId);
     }
 
-    final rows = await request.order('due_at', ascending: true);
-
-    return rows
-        .map((row) => Assignment.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+    return await request.order('due_at', ascending: true);
   }
 
-  Future<Assignment> getAssignment(String id) async {
-    final row = await _client
-        .from('assignments')
-        .select()
-        .eq('id', id)
-        .single();
-
-    return Assignment.fromMap(Map<String, dynamic>.from(row));
+  Future<Assignment> getAssignment(String id) {
+    return JsonCache.instance.cachedRead<Assignment>(
+      key: 'assignment_$id',
+      fetch: () => _client.from('assignments').select().eq('id', id).single(),
+      decode: (raw) =>
+          Assignment.fromMap(Map<String, dynamic>.from(raw as Map)),
+    );
   }
 
-  Future<List<AssignmentQuestion>> listQuestions(String assignmentId) async {
-    final rows = await _client
-        .from('assignment_questions')
-        .select()
-        .eq('assignment_id', assignmentId)
-        .order('position', ascending: true);
-
-    return rows
-        .map(
-          (row) => AssignmentQuestion.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList(growable: false);
+  Future<List<AssignmentQuestion>> listQuestions(String assignmentId) {
+    return JsonCache.instance.cachedRead<List<AssignmentQuestion>>(
+      key: 'assignment_questions_$assignmentId',
+      fetch: () => _client
+          .from('assignment_questions')
+          .select()
+          .eq('assignment_id', assignmentId)
+          .order('position', ascending: true),
+      decode: (raw) => (raw as List)
+          .map(
+            (row) => AssignmentQuestion.fromMap(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
+          .toList(growable: false),
+    );
   }
 
   Future<AssignmentSubmission?> getStudentSubmission({

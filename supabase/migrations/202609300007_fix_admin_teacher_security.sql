@@ -23,9 +23,8 @@ begin
   limit 1;
 
   if v_user_id is null then
-    raise notice
-      'Admin Auth user israelfifen544@gmail.com was not found: promotion skipped.';
-    return;
+    raise exception
+      'Admin Auth user israelfifen544@gmail.com was not found. Create the Auth account first.';
   end if;
 
   select id
@@ -36,10 +35,9 @@ begin
   limit 1;
 
   if v_existing_admin is not null then
-    raise notice
-      'Another administrator already exists: %. Promotion skipped.',
+    raise exception
+      'Another administrator already exists: %. Only one administrator is allowed.',
       v_existing_admin;
-    return;
   end if;
 
   update public.profiles
@@ -71,12 +69,6 @@ begin
     );
   end if;
 end $$;
-
--- Le rôle admin est aussi inscrit dans le jeton (utilisé par les règles du catalogue).
-update auth.users
-set raw_app_meta_data =
-      coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
-where lower(email) = lower('israelfifen544@gmail.com');
 
 -- Restore the protection immediately after the trusted promotion.
 create trigger profiles_protect_role

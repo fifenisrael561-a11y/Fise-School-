@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/offline/local_cleanup.dart';
+import '../../../core/services/push_service.dart';
 import '../../../models/user_profile.dart';
 import '../../notifications/pages/notifications_page.dart';
 
@@ -75,6 +77,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     ? 'Fermer la session Fise School sur cet appareil'
                     : 'Sign out of Fise School on this device',
                 onTap: () async {
+                  await PushService.unregister();
+                  await clearLocalUserData();
                   await Supabase.instance.client.auth.signOut();
                   if (context.mounted) Navigator.popUntil(context, (route) => route.isFirst);
                 },

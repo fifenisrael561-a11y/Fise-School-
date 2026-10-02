@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -31,6 +34,7 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
   bool _sending = false;
   PickedAttachment? _attachment;
   final PhotoService _photoService = PhotoService();
+  RealtimeChannel? _channel;
 
   bool get _isFrench => widget.locale.languageCode == 'fr';
 
@@ -38,11 +42,24 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
   void initState() {
     super.initState();
     _contactsFuture = _service.listContacts();
+    _channel = Supabase.instance.client.channel('private-messages-${widget.profile.id}')
+      ..onPostgresChanges(event: PostgresChangeEvent.insert, schema: 'public', table: 'private_messages', callback: (payload) {
+        final row = payload.newRecord;
+        if (row['sender_id'] == widget.profile.id || row['recipient_id'] == widget.profile.id) {
+          final selected = _selected;
+          if (selected != null && (row['sender_id'] == selected.id || row['recipient_id'] == selected.id)) {
+            _select(selected);
+          }
+          if (mounted) setState(() => _contactsFuture = _service.listContacts());
+        }
+      })
+      .subscribe();
   }
 
   @override
   void dispose() {
     _composer.dispose();
+    _channel?.unsubscribe();
     super.dispose();
   }
 
@@ -183,6 +200,12 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
     );
   }
 
+
+  String _formatTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
   Widget _conversation() {
     final contact = _selected;
     if (contact == null) {
@@ -235,6 +258,20 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
                                   message: message,
                                   isFrench: _isFrench,
                                 ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _formatTime(message.createdAt),
+                                    style: TextStyle(fontSize: 10, color: mine ? Colors.black54 : Colors.black45),
+                                  ),
+                                  if (mine) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(message.readAt == null ? Icons.done_rounded : Icons.done_all_rounded, size: 14, color: message.readAt == null ? Colors.black45 : const Color(0xFF166534)),
+                                  ],
+                                ],
+                              ),
                             ],
                           ),
                         ),

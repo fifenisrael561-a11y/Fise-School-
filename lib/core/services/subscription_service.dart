@@ -21,7 +21,7 @@ class SubscriptionService {
       );
 
       return result == true;
-    } catch (error) {
+    } catch (_) {
       // En cas d'erreur réseau ou Supabase,
       // on ne débloque jamais Premium par défaut.
       return false;
@@ -54,7 +54,7 @@ class SubscriptionService {
       }
 
       return 'free';
-    } catch (error) {
+    } catch (_) {
       return 'free';
     }
   }
@@ -103,7 +103,7 @@ class SubscriptionService {
       }
 
       return Map<String, dynamic>.from(data);
-    } catch (error) {
+    } catch (_) {
       return null;
     }
   }
@@ -171,7 +171,7 @@ class SubscriptionService {
           .maybeSingle();
 
       return data?['role'] == 'student';
-    } catch (error) {
+    } catch (_) {
       return false;
     }
   }

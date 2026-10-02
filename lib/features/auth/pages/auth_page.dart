@@ -163,58 +163,12 @@ class _AuthPageState extends State<AuthPage> {
         setState(() => _isRegistering = false);
       }
     } on AuthException catch (error) {
-      if (mounted) _showError(_authMessage(error));
-    } on PostgrestException catch (error) {
       if (mounted) _showError(error.message);
-    } catch (error) {
-      final text = error.toString();
-      final isNetwork =
-          text.contains('SocketException') ||
-          text.contains('ClientException') ||
-          text.contains('TimeoutException') ||
-          text.contains('Failed host lookup');
-      if (mounted) _showError(isNetwork ? texts.networkError : text);
+    } catch (_) {
+      if (mounted) _showError(texts.networkError);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  /// Messages d'erreur d'authentification lisibles (au lieu du texte anglais brut).
-  String _authMessage(AuthException error) {
-    final fr = _lang == 'fr';
-    final code = (error.code ?? '').toLowerCase();
-    final message = error.message.toLowerCase();
-
-    if (code == 'invalid_credentials' ||
-        message.contains('invalid login credentials')) {
-      return fr
-          ? 'E-mail ou mot de passe incorrect.'
-          : 'Incorrect email or password.';
-    }
-    if (code == 'email_not_confirmed' || message.contains('not confirmed')) {
-      return fr
-          ? 'E-mail non confirmé. Confirmez-le (lien reçu par e-mail) ou '
-                'demandez à l\u2019administrateur de désactiver la confirmation.'
-          : 'Email not confirmed. Confirm it or ask the administrator to '
-                'disable email confirmation.';
-    }
-    if (code == 'user_already_exists' ||
-        message.contains('already registered')) {
-      return fr
-          ? 'Cet e-mail a déjà un compte. Utilisez « Se connecter ».'
-          : 'This email already has an account. Please log in.';
-    }
-    if (code.contains('rate_limit') || message.contains('rate limit')) {
-      return fr
-          ? 'Trop de tentatives. Patientez quelques minutes puis réessayez.'
-          : 'Too many attempts. Wait a few minutes and try again.';
-    }
-    if (code == 'weak_password' || message.contains('password')) {
-      return fr
-          ? 'Mot de passe refusé : choisissez-en un plus long (6 caractères minimum).'
-          : 'Password rejected: choose a longer one (6 characters minimum).';
-    }
-    return error.message;
   }
 
   void _showError(String message) => ScaffoldMessenger.of(

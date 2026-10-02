@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'admin_assignments_page.dart';
 import 'admin_courses_page.dart';
+import 'admin_grades_page.dart';
+import 'admin_past_papers_page.dart';
 import 'admin_pedagogy_page.dart';
 import 'admin_people_page.dart';
 import 'admin_promotion_page.dart';
 import 'admin_school_page.dart';
+import 'admin_timetable_page.dart';
 import 'school_classes_page.dart';
 
 class AdminDashboardPage extends StatelessWidget {
@@ -62,6 +65,21 @@ class AdminDashboardPage extends StatelessWidget {
         icon: Icons.assignment_rounded,
         title: _isFrench ? 'Devoirs' : 'Assignments',
         builder: (_) => AdminAssignmentsPage(locale: locale),
+      ),
+      _AdminEntry(
+        icon: Icons.calendar_month_rounded,
+        title: _isFrench ? 'Emploi du temps' : 'Timetable',
+        builder: (_) => AdminTimetablePage(locale: locale),
+      ),
+      _AdminEntry(
+        icon: Icons.grading_rounded,
+        title: _isFrench ? 'Notes et bulletins' : 'Marks and report cards',
+        builder: (_) => AdminGradesPage(locale: locale),
+      ),
+      _AdminEntry(
+        icon: Icons.history_edu_rounded,
+        title: _isFrench ? 'Annales d\u2019examens' : 'Past exam papers',
+        builder: (_) => AdminPastPapersPage(locale: locale),
       ),
     ];
 

@@ -268,6 +268,66 @@ class SchoolClassService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  Future<List<Map<String, dynamic>>> listClassSubjects(String classId) async {
+    final response = await _client
+        .from('class_subjects')
+        .select('id, class_id, subject_id, is_compulsory, option_group, position, is_active, subjects(*)')
+        .eq('class_id', classId)
+        .eq('is_active', true)
+        .order('position')
+        .order('subject_id');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<List<Map<String, dynamic>>> listAvailableSubjectsForClass({
+    required String classId,
+    required String subsystem,
+    required String sector,
+  }) async {
+    final assigned = await _client
+        .from('class_subjects')
+        .select('subject_id')
+        .eq('class_id', classId);
+    final assignedIds = assigned
+        .map((row) => row['subject_id']?.toString())
+        .whereType<String>()
+        .toSet();
+
+    final response = await _client
+        .from('subjects')
+        .select('id, name_fr, name_en, code, subsystem, sector, description_fr, description_en, is_active')
+        .eq('subsystem', subsystem)
+        .eq('sector', sector)
+        .eq('is_active', true)
+        .order('name_fr');
+
+    return response
+        .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+        .where((row) => !assignedIds.contains(row['id']?.toString()))
+        .toList(growable: false);
+  }
+
+  Future<void> assignSubjectToClass({
+    required String classId,
+    required String subjectId,
+    required int position,
+  }) async {
+    await _client.from('class_subjects').upsert({
+      'class_id': classId,
+      'subject_id': subjectId,
+      'is_compulsory': true,
+      'position': position,
+      'is_active': true,
+    }, onConflict: 'class_id,subject_id');
+  }
+
+  Future<void> removeSubjectFromClass(String classSubjectId) async {
+    await _client
+        .from('class_subjects')
+        .update({'is_active': false})
+        .eq('id', classSubjectId);
+  }
+
   Future<List<Map<String, dynamic>>> listClassTeachers(String classId) async {
     final response = await _client
         .from('class_teachers')

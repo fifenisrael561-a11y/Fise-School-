@@ -111,7 +111,11 @@ class _LessonPageState extends State<LessonPage> {
     try {
       final results = await Future.wait([
         _progressService.get(widget.profile.id, widget.lesson.id),
-        _resourceService.listForLesson(widget.lesson.id),
+        // Les documents joints ne doivent jamais empêcher d'ouvrir la leçon
+        // (par exemple sans connexion).
+        _resourceService
+            .listForLesson(widget.lesson.id)
+            .catchError((Object _) => <CourseResource>[]),
       ]);
 
       final progress = results[0] as LessonProgress?;

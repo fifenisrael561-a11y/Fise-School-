@@ -44,6 +44,11 @@ kotlin {
     }
 }
 
+// Firebase : actif uniquement si google-services.json est présent (sinon l'app se compile sans push).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 flutter {
     source = "../.."
 }

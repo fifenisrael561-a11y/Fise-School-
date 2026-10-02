@@ -7,7 +7,11 @@ import 'app_database.dart';
 
 class OfflineRepository {
   OfflineRepository({AppDatabase? database})
-      : _database = database ?? AppDatabase();
+      : _database = database ?? _sharedDatabase;
+
+  /// Une seule connexion SQLite pour toute l'application : ouvrir plusieurs
+  /// instances Drift sur le même fichier provoque des conflits d'accès.
+  static final AppDatabase _sharedDatabase = AppDatabase();
 
   final AppDatabase _database;
 
@@ -35,6 +39,13 @@ class OfflineRepository {
     }
   }
 
+  /// Remplace tout le cache des cours par la liste serveur : un cours retiré
+  /// ou dépublié par l'enseignant disparaît aussi hors ligne.
+  Future<void> replaceCourses(List<Course> courses) async {
+    await _database.deleteAllCourses();
+    await saveCourses(courses);
+  }
+
   Future<List<Course>> getCourses() async {
     final rows = await _database.getAllCourses();
 
@@ -44,6 +55,11 @@ class OfflineRepository {
 
       return Course.fromMap(json);
     }).toList(growable: false);
+  }
+
+  Future<List<Course>> getCoursesForStudent(String studentId) async {
+    final courses = await getCourses();
+    return courses.where((course) => course.status == 'published').toList(growable: false);
   }
 
   Future<Course?> getCourse(String id) async {
@@ -134,7 +150,8 @@ class OfflineRepository {
   }) async {
     await _database.saveProgress(
       LocalProgressCompanion(
-        id: Value(progress.id),
+        // Local progress has a stable key even before Supabase creates a row.
+        id: Value('${progress.studentId}:${progress.lessonId}'),
         userId: Value(progress.studentId),
         courseId: const Value(null),
         lessonId: Value(progress.lessonId),
@@ -173,6 +190,10 @@ class OfflineRepository {
 
   Future<void> clearLessons() async {
     await _database.deleteAllLessons();
+  }
+
+  Future<void> clearProgress() async {
+    await _database.deleteAllProgress();
   }
 
   // ============================================================

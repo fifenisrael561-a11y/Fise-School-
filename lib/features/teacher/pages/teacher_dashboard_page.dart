@@ -34,9 +34,14 @@ class TeacherDashboardPage extends StatelessWidget {
         title: Text(texts.teacherSpace),
         actions: [
           IconButton(
-            tooltip: texts.signOut,
-            onPressed: onSignOut,
-            icon: const Icon(Icons.logout_rounded),
+            tooltip: texts.settings,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SettingsPage(locale: locale, profile: profile),
+              ),
+            ),
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),
@@ -75,19 +80,19 @@ class TeacherDashboardPage extends StatelessWidget {
                     Chip(
                       label: Text(
                         '${texts.subsystem}: '
-                        '${profile.subsystem ?? texts.temporaryData}',
+                        '${profile.subsystem ?? (locale.languageCode == 'fr' ? 'Non renseigné' : 'Not set')}',
                       ),
                     ),
                     Chip(
                       label: Text(
                         '${texts.examLevel}: '
-                        '${profile.examLevel ?? texts.temporaryData}',
+                        '${profile.examLevel ?? (locale.languageCode == 'fr' ? 'Non renseigné' : 'Not set')}',
                       ),
                     ),
                     Chip(
                       label: Text(
                         '${texts.exam}: '
-                        '${profile.exam ?? texts.temporaryData}',
+                        '${profile.exam ?? (locale.languageCode == 'fr' ? 'Non renseigné' : 'Not set')}',
                       ),
                     ),
                   ],
@@ -129,7 +134,7 @@ class TeacherDashboardPage extends StatelessWidget {
                     ),
                     _Tile(
                       Icons.menu_book_rounded,
-                      texts.courses,
+                      locale.languageCode == 'fr' ? 'Cours et contenus' : 'Courses and content',
                       () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -142,7 +147,7 @@ class TeacherDashboardPage extends StatelessWidget {
                     ),
                     _Tile(
                       Icons.assignment_rounded,
-                      texts.assignments,
+                      locale.languageCode == 'fr' ? 'QCM et exercices' : 'Quizzes and exercises',
                       () => Navigator.push(
                         context,
                         MaterialPageRoute(

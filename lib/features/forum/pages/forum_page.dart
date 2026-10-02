@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/forum_service.dart';
 import '../../../models/forum.dart';
@@ -57,6 +58,58 @@ class _ForumPageState extends State<ForumPage> {
     }
   }
 
+  bool get _isTeacher => widget.profile.role == 'teacher';
+
+  Future<void> _createTeacherForum() async {
+    ForumClass? selected = _classes.length == 1 ? _classes.first : null;
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(_isFrench ? 'Créer un forum' : 'Create a forum'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              DropdownButtonFormField<ForumClass>(
+                value: selected,
+                decoration: InputDecoration(
+                  labelText: _isFrench ? 'Salle de classe' : 'Classroom',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.school_outlined),
+                ),
+                items: _classes.map((room) => DropdownMenuItem(value: room, child: Text(room.displayName))).toList(),
+                onChanged: (value) => setDialogState(() => selected = value),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: titleController, onChanged: (_) => setDialogState(() {}), decoration: InputDecoration(labelText: _isFrench ? 'Nom du forum' : 'Forum name', border: const OutlineInputBorder())),
+              const SizedBox(height: 12),
+              TextField(controller: descriptionController, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: _isFrench ? 'Description (facultative)' : 'Description (optional)', border: const OutlineInputBorder())),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_isFrench ? 'Annuler' : 'Cancel')),
+            FilledButton(
+              onPressed: selected == null || titleController.text.trim().isEmpty ? null : () async {
+                try {
+                  await _service.createTopic(classId: selected!.id, authorId: widget.profile.id, authorName: _authorName(widget.profile), title: titleController.text.trim(), description: descriptionController.text.trim());
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (_) {
+                  if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_isFrench ? 'Impossible de créer le forum.' : 'Unable to create the forum.')));
+                }
+              },
+              child: Text(_isFrench ? 'Créer' : 'Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+    titleController.dispose();
+    descriptionController.dispose();
+    if (result == true) await _loadClasses();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,6 +119,13 @@ class _ForumPageState extends State<ForumPage> {
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
+      floatingActionButton: _isTeacher && _classes.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _createTeacherForum,
+              icon: const Icon(Icons.add_comment_rounded),
+              label: Text(_isFrench ? 'Nouveau forum' : 'New forum'),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _loadClasses,
         child: _loading
@@ -691,26 +751,14 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
         return;
       }
 
-      await showDialog<void>(
-        context: context,
-        builder: (_) {
-          return AlertDialog(
-            title: Text(
-              post.attachmentName ??
-                  (_isFrench ? 'Pièce jointe' : 'Attachment'),
-            ),
-            content: SelectableText(url),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: Text(_isFrench ? 'Fermer' : 'Close'),
-              ),
-            ],
-          );
-        },
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
       );
+
+      if (!opened) {
+        throw Exception('Unable to open attachment');
+      }
     } catch (_) {
       if (!mounted) return;
 

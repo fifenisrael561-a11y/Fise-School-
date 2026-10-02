@@ -6,6 +6,7 @@ import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
 import 'create_course_page.dart';
 import 'create_lesson_page.dart';
+import 'teacher_resource_page.dart';
 
 class TeacherCoursesPage extends StatefulWidget {
   final Locale locale;
@@ -71,6 +72,14 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
       return;
     }
 
+    setState(_reload);
+  }
+
+  Future<void> _manageResources(Course course) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherResourcePage(
+      locale: widget.locale, profile: widget.profile, course: course,
+    )));
+    if (!mounted) return;
     setState(_reload);
   }
 
@@ -278,6 +287,7 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
                   locale: widget.locale,
                   onAddLesson: () => _createLesson(course),
                   onShowLessons: () => _showLessons(course),
+                  onResources: () => _manageResources(course),
                   onArchive: course.status == 'draft'
                       ? () => _archiveCourse(course)
                       : null,
@@ -298,6 +308,7 @@ class _CourseCard extends StatelessWidget {
   final Locale locale;
   final VoidCallback onAddLesson;
   final VoidCallback onShowLessons;
+  final VoidCallback onResources;
   final VoidCallback? onArchive;
   final LessonService lessonService;
   final bool isFrench;
@@ -307,6 +318,7 @@ class _CourseCard extends StatelessWidget {
     required this.locale,
     required this.onAddLesson,
     required this.onShowLessons,
+    required this.onResources,
     required this.onArchive,
     required this.lessonService,
     required this.isFrench,
@@ -391,6 +403,11 @@ class _CourseCard extends StatelessWidget {
                   onPressed: onShowLessons,
                   icon: const Icon(Icons.menu_book_outlined),
                   label: Text(isFrench ? 'Leçons' : 'Lessons'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onResources,
+                  icon: const Icon(Icons.attach_file_rounded),
+                  label: Text(isFrench ? 'Documents / médias' : 'Documents / media'),
                 ),
                 FilledButton.icon(
                   onPressed: onAddLesson,

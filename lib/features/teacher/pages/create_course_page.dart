@@ -33,7 +33,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   final _contentEn = TextEditingController();
 
   late Future<List<SchoolClass>> _classesFuture;
-  late Future<List<Subject>> _subjectsFuture;
+  Future<List<Subject>>? _subjectsFuture;
 
   Curriculum? _curriculum;
   CourseChapter? _chapter;
@@ -49,7 +49,6 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   void initState() {
     super.initState();
     _classesFuture = _service.listTeacherClasses(widget.profile.id);
-    _subjectsFuture = _service.listSubjects(widget.profile);
   }
 
   @override
@@ -66,6 +65,18 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
 
     super.dispose();
+  }
+
+  Future<void> _selectClass(SchoolClass? schoolClass) async {
+    setState(() {
+      _schoolClass = schoolClass;
+      _subject = null;
+      _curriculum = null;
+      _chapter = null;
+      _curricula = const [];
+      _chapters = const [];
+      _subjectsFuture = schoolClass == null ? null : _service.listSubjectsForClass(schoolClass.id);
+    });
   }
 
   Future<void> _selectSubject(Subject? subject) async {
@@ -230,11 +241,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                   value: _schoolClass,
                   items: snapshot.data ?? const [],
                   labelOf: (item) => item.displayName,
-                  onChanged: (value) {
-                    setState(() {
-                      _schoolClass = value;
-                    });
-                  },
+                  onChanged: _selectClass,
                 );
               },
             ),
@@ -242,6 +249,19 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             FutureBuilder<List<Subject>>(
               future: _subjectsFuture,
               builder: (_, snapshot) {
+                if (_schoolClass == null) {
+                  return InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: texts.subjects,
+                      border: const OutlineInputBorder(),
+                    ),
+                    child: Text(
+                      widget.locale.languageCode == 'fr'
+                          ? 'Sélectionnez d’abord la salle de classe.'
+                          : 'Select the classroom first.',
+                    ),
+                  );
+                }
                 return _dropdown<Subject>(
                   label: texts.subjects,
                   value: _subject,
@@ -271,6 +291,27 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                 });
               },
             ),
+            const SizedBox(height: 16),
+            if (_schoolClass != null && _subject != null)
+              Card(
+                margin: EdgeInsets.zero,
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.school_rounded),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${_schoolClass!.displayName} • ${_subject!.labelFor(widget.locale.languageCode)}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 20),
             _field(_titleFr, texts.titleFrench),
             _field(_titleEn, texts.titleEnglish),

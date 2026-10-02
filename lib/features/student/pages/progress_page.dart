@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/offline/json_cache.dart';
 import '../../../models/user_profile.dart';
 
 class ProgressPage extends StatefulWidget {
@@ -42,11 +43,15 @@ class _ProgressPageState extends State<ProgressPage> {
     });
 
     try {
-      final memberships = await _client
-          .from('class_students')
-          .select('class_id')
-          .eq('student_id', widget.profile.id)
-          .eq('is_active', true);
+      final memberships = await JsonCache.instance.cachedRead<List<dynamic>>(
+        key: 'progress_memberships_${widget.profile.id}',
+        fetch: () => _client
+            .from('class_students')
+            .select('class_id')
+            .eq('student_id', widget.profile.id)
+            .eq('is_active', true),
+        decode: (raw) => raw as List,
+      );
 
       final classIds = memberships
           .map((row) => row['class_id']?.toString())
@@ -69,12 +74,16 @@ class _ProgressPageState extends State<ProgressPage> {
         return;
       }
 
-      final courseRows = await _client
-          .from('courses')
-          .select()
-          .eq('status', 'published')
-          .inFilter('class_id', classIds)
-          .order('updated_at', ascending: false);
+      final courseRows = await JsonCache.instance.cachedRead<List<dynamic>>(
+        key: 'progress_courses_${widget.profile.id}',
+        fetch: () => _client
+            .from('courses')
+            .select()
+            .eq('status', 'published')
+            .inFilter('class_id', classIds)
+            .order('updated_at', ascending: false),
+        decode: (raw) => raw as List,
+      );
 
       final List<_CourseProgressData> courseResults = [];
 
@@ -92,12 +101,16 @@ class _ProgressPageState extends State<ProgressPage> {
           continue;
         }
 
-        final lessonsRows = await _client
-            .from('lessons')
-            .select()
-            .eq('course_id', courseId)
-            .eq('is_published', true)
-            .order('position');
+        final lessonsRows = await JsonCache.instance.cachedRead<List<dynamic>>(
+          key: 'progress_lessons_$courseId',
+          fetch: () => _client
+              .from('lessons')
+              .select()
+              .eq('course_id', courseId)
+              .eq('is_published', true)
+              .order('position'),
+          decode: (raw) => raw as List,
+        );
 
         final lessonIds = lessonsRows
             .map((row) => row['id']?.toString())
@@ -109,11 +122,15 @@ class _ProgressPageState extends State<ProgressPage> {
           continue;
         }
 
-        final progressRows = await _client
-            .from('lesson_progress')
-            .select()
-            .eq('student_id', widget.profile.id)
-            .inFilter('lesson_id', lessonIds);
+        final progressRows = await JsonCache.instance.cachedRead<List<dynamic>>(
+          key: 'progress_rows_${widget.profile.id}_$courseId',
+          fetch: () => _client
+              .from('lesson_progress')
+              .select()
+              .eq('student_id', widget.profile.id)
+              .inFilter('lesson_id', lessonIds),
+          decode: (raw) => raw as List,
+        );
 
         final progressByLesson = <String, Map<String, dynamic>>{};
 
@@ -123,6 +140,21 @@ class _ProgressPageState extends State<ProgressPage> {
 
           if (lessonId != null && lessonId.isNotEmpty) {
             progressByLesson[lessonId] = progress;
+          }
+        }
+
+        // Progression faite hors ligne et pas encore envoyée : elle prime
+        // sur la copie du serveur si la leçon est terminée localement.
+        for (final lessonId in lessonIds) {
+          final local = await JsonCache.instance.read(
+            'progress_${widget.profile.id}_$lessonId',
+          );
+          if (local is Map) {
+            final localProgress = Map<String, dynamic>.from(local);
+            if (localProgress['status'] == 'completed' ||
+                !progressByLesson.containsKey(lessonId)) {
+              progressByLesson[lessonId] = localProgress;
+            }
           }
         }
 
@@ -188,7 +220,7 @@ class _ProgressPageState extends State<ProgressPage> {
         _courses = courseResults;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {

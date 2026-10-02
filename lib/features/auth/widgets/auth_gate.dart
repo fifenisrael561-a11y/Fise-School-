@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_texts.dart';
 import '../../../core/services/session_service.dart';
+import '../../../core/offline/connectivity_service.dart';
+import '../../../core/offline/sync_service.dart';
 import '../../admin/pages/admin_dashboard_page.dart';
 import '../../public/pages/public_home_page.dart';
-import '../../student/pages/student_dashboard_page.dart';
-import '../../teacher/pages/teacher_dashboard_page.dart';
+import '../../student/pages/student_main_page.dart';
+import '../../../core/services/push_service.dart';
+import '../../../models/user_profile.dart';
+import '../../teacher/pages/teacher_main_page.dart';
 
 class AuthGate extends StatefulWidget {
   final Locale locale;
@@ -29,6 +33,9 @@ class _AuthGateState extends State<AuthGate> {
   SessionState _state = const SessionState.loading();
   StreamSubscription<SessionState>? _subscription;
   int _eventCount = 0;
+  StreamSubscription<bool>? _connectivitySubscription;
+  String? _syncedStudentId;
+  bool _syncing = false;
 
   @override
   void initState() {
@@ -39,6 +46,19 @@ class _AuthGateState extends State<AuthGate> {
       _updateState(state);
     });
     _load();
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((
+      online,
+    ) {
+      final profile = _state.profile;
+      if (online &&
+          _state.status == SessionStatus.authenticated &&
+          profile != null &&
+          profile.role.toLowerCase() == 'student') {
+        // Retour du réseau : on envoie la progression en attente et on
+        // rafraîchit le cache.
+        _syncStudentOfflineCache(profile, force: true);
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -56,11 +76,46 @@ class _AuthGateState extends State<AuthGate> {
     setState(() {
       _state = state;
     });
+
+    if (state.status == SessionStatus.authenticated && state.profile != null) {
+      PushService.registerForUser(state.profile!.id);
+    }
+
+    if (state.status == SessionStatus.authenticated &&
+        state.profile?.role.toLowerCase() == 'student') {
+      _syncStudentOfflineCache(state.profile!);
+    } else if (state.status == SessionStatus.signedOut) {
+      _syncedStudentId = null;
+    }
+  }
+
+  Future<void> _syncStudentOfflineCache(
+    UserProfile profile, {
+    bool force = false,
+  }) async {
+    if (_syncing) return;
+    if (!force && _syncedStudentId == profile.id) return;
+    _syncing = true;
+    try {
+      // Sans réseau on ne marque rien comme « synchronisé » : la prochaine
+      // reconnexion relancera la synchronisation.
+      if (!await ConnectivityService().isOnline()) return;
+      final sync = SyncService();
+      await sync.flushPending();
+      await sync.syncStudentCourses(profile.id);
+      await sync.syncStudentExtras(profile);
+      _syncedStudentId = profile.id;
+    } catch (_) {
+      // The app remains usable with whatever cache is already available.
+    } finally {
+      _syncing = false;
+    }
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -94,7 +149,7 @@ class _AuthGateState extends State<AuthGate> {
 
     switch (profile.role.toLowerCase()) {
       case 'student':
-        return StudentDashboardPage(
+        return StudentMainPage(
           locale: widget.locale,
           profile: profile,
           onSignOut: () async {
@@ -103,7 +158,7 @@ class _AuthGateState extends State<AuthGate> {
         );
 
       case 'teacher':
-        return TeacherDashboardPage(
+        return TeacherMainPage(
           locale: widget.locale,
           profile: profile,
           onSignOut: () async {

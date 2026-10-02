@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/services/assignment_service.dart';
 import '../../../models/user_profile.dart';
+import '../../../core/services/pedagogy_service.dart';
+import '../../../models/pedagogy.dart';
+import '../../../models/school_class.dart';
 import 'create_assignment_questions_page.dart';
 
 class CreateAssignmentPage extends StatefulWidget {
@@ -23,14 +26,19 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
 
   final _formKey = GlobalKey<FormState>();
 
-  final _courseController = TextEditingController();
-  final _lessonController = TextEditingController();
-  final _classController = TextEditingController();
   final _titleFrController = TextEditingController();
   final _titleEnController = TextEditingController();
   final _instructionsFrController = TextEditingController();
   final _instructionsEnController = TextEditingController();
   final _scoreController = TextEditingController(text: '20');
+
+  final CourseService _courseService = CourseService();
+  late Future<List<SchoolClass>> _classesFuture;
+  List<Course> _courses = const [];
+  List<Lesson> _lessons = const [];
+  SchoolClass? _selectedClass;
+  Course? _selectedCourse;
+  Lesson? _selectedLesson;
 
   String _status = 'draft';
   DateTime? _dueAt;
@@ -39,10 +47,13 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
   bool get _isEnglish => widget.locale.languageCode == 'en';
 
   @override
+  void initState() {
+    super.initState();
+    _classesFuture = _courseService.listTeacherClasses(widget.profile.id);
+  }
+
+  @override
   void dispose() {
-    _courseController.dispose();
-    _lessonController.dispose();
-    _classController.dispose();
     _titleFrController.dispose();
     _titleEnController.dispose();
     _instructionsFrController.dispose();
@@ -53,6 +64,11 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
 
   Future<void> _saveAssignment() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_selectedClass == null || _selectedCourse == null) {
+      _showMessage(_isEnglish ? 'Select the classroom and course first.' : 'Sélectionnez d’abord la salle et le cours.');
       return;
     }
 
@@ -73,12 +89,10 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
       });
 
       final assignment = await _service.saveAssignment(
-        courseId: _courseController.text.trim(),
-        lessonId: _lessonController.text.trim().isEmpty
-            ? null
-            : _lessonController.text.trim(),
+        courseId: _selectedCourse!.id,
+        lessonId: _selectedLesson?.id,
         teacherId: widget.profile.id,
-        classId: _classController.text.trim(),
+        classId: _selectedClass!.id,
         titleFr: _titleFrController.text.trim(),
         titleEn: _titleEnController.text.trim(),
         instructionsFr: _instructionsFrController.text.trim().isEmpty
@@ -141,6 +155,34 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
         });
       }
     }
+  }
+
+  Future<void> _selectClass(SchoolClass? value) async {
+    setState(() {
+      _selectedClass = value;
+      _selectedCourse = null;
+      _selectedLesson = null;
+      _courses = const [];
+      _lessons = const [];
+    });
+    if (value == null) return;
+    final courses = await _courseService.listTeacherCourses(widget.profile.id);
+    if (!mounted) return;
+    setState(() {
+      _courses = courses.where((c) => c.classId == value.id && c.status != 'archived').toList(growable: false);
+    });
+  }
+
+  Future<void> _selectCourse(Course? value) async {
+    setState(() {
+      _selectedCourse = value;
+      _selectedLesson = null;
+      _lessons = const [];
+    });
+    if (value == null) return;
+    final lessons = await _courseService.listAllLessons(value.id);
+    if (!mounted) return;
+    setState(() { _lessons = lessons; });
   }
 
   Future<void> _pickDueDate() async {
@@ -219,7 +261,7 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
           children: [
             _buildHeader(),
             const SizedBox(height: 18),
-            _buildTechnicalIdsSection(),
+            _buildLearningContextSection(),
             const SizedBox(height: 18),
             _buildTitlesSection(),
             const SizedBox(height: 18),
@@ -303,84 +345,42 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
     );
   }
 
-  Widget _buildTechnicalIdsSection() {
+  Widget _buildLearningContextSection() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _isEnglish ? 'Assignment context' : 'Contexte du devoir',
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_isEnglish ? 'Learning location' : 'Emplacement pédagogique', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Text(_isEnglish ? 'Choose where students will find this activity. IDs are handled automatically.' : 'Choisissez où les élèves trouveront cette activité. Les identifiants sont gérés automatiquement.'),
+        const SizedBox(height: 14),
+        FutureBuilder<List<SchoolClass>>(
+          future: _classesFuture,
+          builder: (_, snapshot) => _dropdown<SchoolClass>(
+            label: _isEnglish ? 'Classroom' : 'Salle de classe', value: _selectedClass,
+            items: snapshot.data ?? const [], labelOf: (item) => item.displayName, onChanged: _selectClass,
           ),
-          const SizedBox(height: 14),
-          TextFormField(
-            controller: _courseController,
-            decoration: InputDecoration(
-              labelText: _isEnglish ? 'Course ID' : 'ID du cours',
-              prefixIcon: const Icon(Icons.menu_book_rounded),
-              filled: true,
-              fillColor: const Color(0xFFF7F9F8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return _isEnglish
-                    ? 'Course ID is required.'
-                    : 'L’ID du cours est obligatoire.';
-              }
+        ),
+        const SizedBox(height: 12),
+        _dropdown<Course>(
+          label: _isEnglish ? 'Course' : 'Cours', value: _selectedCourse, items: _courses,
+          labelOf: (item) => item.labelFor(widget.locale.languageCode), onChanged: _selectCourse,
+        ),
+        const SizedBox(height: 12),
+        _dropdown<Lesson>(
+          label: _isEnglish ? 'Lesson (optional)' : 'Leçon (facultative)', value: _selectedLesson, items: _lessons,
+          labelOf: (item) => item.labelFor(widget.locale.languageCode), onChanged: (value) => setState(() => _selectedLesson = value),
+        ),
+      ]),
+    );
+  }
 
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _lessonController,
-            decoration: InputDecoration(
-              labelText: _isEnglish
-                  ? 'Lesson ID (optional)'
-                  : 'ID de la leçon (facultatif)',
-              prefixIcon: const Icon(Icons.article_outlined),
-              filled: true,
-              fillColor: const Color(0xFFF7F9F8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _classController,
-            decoration: InputDecoration(
-              labelText: _isEnglish ? 'Class ID' : 'ID de la classe',
-              prefixIcon: const Icon(Icons.groups_rounded),
-              filled: true,
-              fillColor: const Color(0xFFF7F9F8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return _isEnglish
-                    ? 'Class ID is required.'
-                    : 'L’ID de la classe est obligatoire.';
-              }
-
-              return null;
-            },
-          ),
-        ],
-      ),
+  Widget _dropdown<T>({required String label, required T? value, required List<T> items, required String Function(T) labelOf, required ValueChanged<T?> onChanged}) {
+    return DropdownButtonFormField<T>(
+      initialValue: items.contains(value) ? value : null,
+      decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.arrow_drop_down_circle_outlined), filled: true, fillColor: const Color(0xFFF7F9F8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)),
+      items: items.map((item) => DropdownMenuItem<T>(value: item, child: Text(labelOf(item), overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: items.isEmpty ? null : onChanged,
     );
   }
 

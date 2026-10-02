@@ -1,63 +1,126 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+const ALLOWED_MIME = new Set([
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function cleanHistory(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .slice(-20)
+    .map((item: Record<string, unknown>) => ({
+      role: item.role === "model" ? "model" : "user",
+      text: String(item.text ?? "").trim().slice(0, 12000),
+    }))
+    .filter((item) => item.text.length > 0);
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
   try {
-    const auth = req.headers.get("Authorization");
-    if (!auth?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Authentication required." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json({ error: "Authentication required." }, 401);
     }
 
+    const accessToken = authHeader.slice("Bearer ".length).trim();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return json({ error: "Supabase authentication is not configured." }, 500);
+    }
+    if (!apiKey) return json({ error: "GEMINI_API_KEY is not configured." }, 500);
+
+    // Verify the actual Supabase access token. Merely checking for a Bearer
+    // header is not authentication.
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
+    if (userError || !userData.user) return json({ error: "Invalid or expired session." }, 401);
+
+    const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("first_name,last_name,preferred_language,subsystem,sector,class_name,exam_level_label,exam_label,role")
+      .eq("id", userData.user.id)
+      .maybeSingle();
+    if (profileError || !profile) return json({ error: "School profile unavailable." }, 403);
 
     const body = await req.json();
-    const message = String(body?.message ?? "").trim();
-    const language = body?.language === "en" ? "en" : "fr";
-    const profile = body?.profile ?? {};
-    const image = body?.image;
+    const message = String(body?.message ?? "").trim().slice(0, 12000);
+    const language = profile.preferred_language === "en" ? "en" : "fr";
+    const attachment = body?.attachment;
 
-    if (!message && !image?.base64) {
-      throw new Error("A message or image is required.");
+    if (!message && !attachment?.base64) {
+      return json({ error: "A message or attachment is required." }, 400);
+    }
+
+    let attachmentPart: Record<string, unknown> | null = null;
+    if (attachment?.base64) {
+      const mime = String(attachment.mimeType ?? "application/octet-stream").toLowerCase();
+      const base64 = String(attachment.base64);
+      if (!ALLOWED_MIME.has(mime)) {
+        return json({ error: language === "fr"
+          ? "Type de fichier non pris en charge. Utilise une image, un PDF ou un fichier texte."
+          : "Unsupported file type. Use an image, PDF, or text file." }, 400);
+      }
+      // Base64 is roughly 4/3 of the binary size.
+      if (Math.ceil(base64.length * 3 / 4) > MAX_ATTACHMENT_BYTES) {
+        return json({ error: language === "fr"
+          ? "Fichier trop volumineux. La limite est de 8 Mo."
+          : "File is too large. The limit is 8 MB." }, 413);
+      }
+      attachmentPart = {
+        inline_data: { mime_type: mime, data: base64 },
+      };
     }
 
     const schoolContext = language === "en"
       ? `You are Fise School AI, an educational assistant for Cameroon.
-Student profile: subsystem=${profile.subsystem ?? "unknown"}, sector=${profile.sector ?? "unknown"},
-class=${profile.className ?? "unknown"}, examLevel=${profile.examLevel ?? "unknown"}, exam=${profile.exam ?? "unknown"}.
-Explain lessons, exercises and revision clearly and at the student's level.`
-      : `Tu es l'assistant IA éducatif de Fise School au Cameroun.
-Profil scolaire: sous-système=${profile.subsystem ?? "inconnu"}, secteur=${profile.sector ?? "inconnu"},
-classe=${profile.className ?? "inconnue"}, niveau d'examen=${profile.examLevel ?? "inconnu"}, examen=${profile.exam ?? "inconnu"}.
-Explique les leçons, exercices et révisions clairement, au niveau de l'élève.`;
+Authenticated student/teacher profile: first name=${profile.first_name ?? "unknown"}, role=${profile.role ?? "unknown"}, subsystem=${profile.subsystem ?? "unknown"}, sector=${profile.sector ?? "unknown"}, class=${profile.class_name ?? "unknown"}, exam level=${profile.exam_level_label ?? "unknown"}, exam=${profile.exam_label ?? "unknown"}.
+Teach clearly and accurately at the user's school level. When solving schoolwork, explain the reasoning instead of only giving a result. Never invent a Fise School course or curriculum detail that is not present in the conversation or attachment.`
+      : `Tu es Fise School AI, un assistant éducatif pour le Cameroun.
+Profil authentifié : prénom=${profile.first_name ?? "inconnu"}, rôle=${profile.role ?? "inconnu"}, sous-système=${profile.subsystem ?? "inconnu"}, secteur=${profile.sector ?? "inconnu"}, classe=${profile.class_name ?? "inconnue"}, niveau d'examen=${profile.exam_level_label ?? "inconnu"}, examen=${profile.exam_label ?? "inconnu"}.
+Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un exercice, explique le raisonnement et pas seulement le résultat. N'invente jamais un détail de programme ou de cours Fise School qui n'est pas présent dans la conversation ou le document/photo.`;
 
-    const parts: Record<string, unknown>[] = [
-      { text: schoolContext },
-    ];
+    const history = cleanHistory(body?.history);
+    const contents: Record<string, unknown>[] = history.map((item) => ({
+      role: item.role,
+      parts: [{ text: item.text }],
+    }));
+    const currentParts: Record<string, unknown>[] = [];
+    if (attachmentPart) currentParts.push(attachmentPart);
+    if (message) currentParts.push({ text: message });
+    contents.push({ role: "user", parts: currentParts });
 
-    if (image?.base64) {
-      parts.push({
-        inline_data: {
-          mime_type: String(image.mimeType ?? "image/jpeg"),
-          data: String(image.base64),
-        },
-      });
-    }
-
-    if (message) parts.push({ text: message });
-
-    const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
@@ -67,7 +130,8 @@ Explique les leçons, exercices et révisions clairement, au niveau de l'élève
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{ role: "user", parts }],
+          systemInstruction: { parts: [{ text: schoolContext }] },
+          contents,
           generationConfig: { temperature: 0.4 },
         }),
       },
@@ -84,16 +148,10 @@ Explique les leçons, exercices et révisions clairement, au niveau de l'élève
       .trim();
 
     if (!text) throw new Error("Gemini returned an empty response.");
-
-    return new Response(JSON.stringify({ text }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ text });
   } catch (error) {
-    return new Response(JSON.stringify({
+    return json({
       error: error instanceof Error ? error.message : "Unknown error",
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    }, 500);
   }
 });

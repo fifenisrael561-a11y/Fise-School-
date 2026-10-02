@@ -103,6 +103,10 @@ class AppDatabase extends _$AppDatabase {
     await delete(cachedLessons).go();
   }
 
+  Future<void> deleteAllProgress() async {
+    await delete(localProgress).go();
+  }
+
   Future<void> closeDatabase() async {
     await close();
   }

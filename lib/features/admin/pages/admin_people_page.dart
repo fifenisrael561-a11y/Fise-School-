@@ -106,8 +106,8 @@ class _AdminPeoplePageState extends State<AdminPeoplePage> {
       title: Text('${person.firstName} ${person.lastName}'),
       subtitle: Text(
         '${person.email ?? ''}\n'
-        '${person.subsystem ?? texts.temporaryData} • '
-        '${person.sector ?? texts.temporaryData}',
+        '${person.subsystem ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')} • '
+        '${person.sector ?? (texts.isEnglish ? 'Not set' : 'Non renseigné')}',
       ),
       isThreeLine: true,
       trailing: const Icon(Icons.arrow_forward_ios),

@@ -61,17 +61,12 @@ class AdminPedagogyPage extends StatelessWidget {
           _buildModule(
             context,
             icon: Icons.photo_library_rounded,
-            title: _isFrench ? 'Photos et ressources' : 'Photos and resources',
+            title: _isFrench ? 'Photos, PDF et ressources' : 'Photos, PDF and resources',
             subtitle: _isFrench
                 ? 'Ajouter des photos, documents et autres ressources pédagogiques.'
                 : 'Add photos, documents and other educational resources.',
             onTap: () {
-              _showComingSoon(
-                context,
-                _isFrench
-                    ? 'Gestion des photos et ressources'
-                    : 'Photos and resource management',
-              );
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminCoursesPage(locale: locale)));
             },
           ),
 
@@ -186,7 +181,7 @@ class AdminPedagogyPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _isFrench ? '$title : module suivant.' : '$title: next module.',
+          _isFrench ? '$title : ce module sera activé après la configuration du catalogue.' : '$title: this module will be enabled after catalog configuration.',
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/localization/app_texts.dart';
 import '../../../core/services/notification_service.dart';
@@ -24,9 +25,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
   late final NotificationService _service =
       widget.notificationService ?? NotificationService();
 
-  late Future<List<AppNotification>> _future = _service.listForUser(
-    widget.userId,
-  );
+  late Future<List<AppNotification>> _future = _service.listForUser(widget.userId);
+  RealtimeChannel? _realtime;
+
+  @override
+  void initState() {
+    super.initState();
+    final channel = Supabase.instance.client.channel('notifications-${widget.userId}');
+    _realtime = channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          callback: (_) { if (mounted) setState(() => _future = _service.listForUser(widget.userId)); },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _realtime?.unsubscribe();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,20 +79,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
             padding: const EdgeInsets.all(20),
             itemCount: items.length,
             separatorBuilder: (_, _) => const Divider(),
-            itemBuilder: (context, index) => ListTile(
-              tileColor: items[index].isRead ? null : const Color(0xFFEAF5ED),
-              title: Text(items[index].title),
-              subtitle: Text(items[index].body),
-              onTap: () async {
-                await _service.markRead(items[index].id);
-
-                setState(() => _future = _service.listForUser(widget.userId));
-              },
-            ),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return ListTile(
+                tileColor: item.isRead ? null : const Color(0xFFEAF5ED),
+                leading: CircleAvatar(child: Icon(_iconFor(item.type))),
+                title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text('${item.body}\n${_formatTime(item.createdAt)}'),
+                isThreeLine: true,
+                onTap: () async {
+                  await _service.markRead(item.id);
+                  if (mounted) setState(() => _future = _service.listForUser(widget.userId));
+                },
+              );
+            },
           );
         },
       ),
     );
+  }
+
+  IconData _iconFor(String type) {
+    switch (type) {
+      case 'message': return Icons.chat_bubble_outline;
+      case 'assignment': return Icons.assignment_outlined;
+      case 'course': return Icons.menu_book_outlined;
+      case 'timetable': return Icons.calendar_month_outlined;
+      case 'forum': return Icons.forum_outlined;
+      case 'submission': return Icons.task_alt_outlined;
+      default: return Icons.notifications_outlined;
+    }
+  }
+
+  String _formatTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _markAll() async {

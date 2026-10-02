@@ -1,8 +1,10 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/forum.dart';
 import '../../models/user_profile.dart';
+import '../offline/json_cache.dart';
 
 class ForumService {
   final SupabaseClient _client;
@@ -10,69 +12,75 @@ class ForumService {
   ForumService({SupabaseClient? client})
     : _client = client ?? Supabase.instance.client;
 
-  Future<List<ForumClass>> listClasses(UserProfile profile) async {
+  Future<List<ForumClass>> listClasses(UserProfile profile) {
+    return JsonCache.instance.cachedRead<List<ForumClass>>(
+      key: 'forum_classes_${profile.role}_${profile.id}',
+      fetch: () => _fetchClassRows(profile),
+      decode: (raw) => (raw as List)
+          .map(
+            (row) => ForumClass.fromMap(Map<String, dynamic>.from(row as Map)),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  /// Retourne des lignes [{id, name, display_name}] (déjà aplaties pour
+  /// pouvoir être conservées telles quelles dans le cache).
+  Future<List<dynamic>> _fetchClassRows(UserProfile profile) async {
+    final String table;
+    final String column;
     if (profile.role == 'student') {
-      final rows = await _client
-          .from('class_students')
-          .select('class_id, school_classes(id, name, display_name)')
-          .eq('student_id', profile.id)
-          .eq('is_active', true);
-
-      return rows
-          .map((row) {
-            final data = Map<String, dynamic>.from(
-              row['school_classes'] as Map,
-            );
-
-            return ForumClass.fromMap(data);
-          })
-          .toList(growable: false);
+      table = 'class_students';
+      column = 'student_id';
+    } else if (profile.role == 'teacher') {
+      table = 'class_teachers';
+      column = 'teacher_id';
+    } else {
+      return const <dynamic>[];
     }
 
-    if (profile.role == 'teacher') {
-      final rows = await _client
-          .from('class_teachers')
-          .select('class_id, school_classes(id, name, display_name)')
-          .eq('teacher_id', profile.id)
-          .eq('is_active', true);
-
-      return rows
-          .map((row) {
-            final data = Map<String, dynamic>.from(
-              row['school_classes'] as Map,
-            );
-
-            return ForumClass.fromMap(data);
-          })
-          .toList(growable: false);
-    }
-
-    return const [];
-  }
-
-  Future<List<ForumTopic>> listTopics(String classId) async {
     final rows = await _client
-        .from('forum_topics')
-        .select()
-        .eq('class_id', classId)
-        .order('is_pinned', ascending: false)
-        .order('created_at', ascending: false);
+        .from(table)
+        .select('class_id, school_classes(id, name, display_name)')
+        .eq(column, profile.id)
+        .eq('is_active', true);
 
     return rows
-        .map((row) => ForumTopic.fromMap(Map<String, dynamic>.from(row)))
+        .map((row) => Map<String, dynamic>.from(row['school_classes'] as Map))
         .toList(growable: false);
   }
 
-  Future<List<ForumPost>> listPosts(String topicId) async {
-    final rows = await _client
-        .from('forum_posts')
-        .select()
-        .eq('topic_id', topicId)
-        .order('created_at', ascending: true);
+  Future<List<ForumTopic>> listTopics(String classId) {
+    return JsonCache.instance.cachedRead<List<ForumTopic>>(
+      key: 'forum_topics_$classId',
+      fetch: () => _client
+          .from('forum_topics')
+          .select()
+          .eq('class_id', classId)
+          .order('is_pinned', ascending: false)
+          .order('created_at', ascending: false),
+      decode: (raw) => (raw as List)
+          .map(
+            (row) => ForumTopic.fromMap(Map<String, dynamic>.from(row as Map)),
+          )
+          .toList(growable: false),
+    );
+  }
 
-    return rows
-        .map((row) => ForumPost.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+  Future<List<ForumPost>> listPosts(String topicId) {
+    return JsonCache.instance.cachedRead<List<ForumPost>>(
+      key: 'forum_posts_$topicId',
+      fetch: () => _client
+          .from('forum_posts')
+          .select()
+          .eq('topic_id', topicId)
+          .order('created_at', ascending: true),
+      decode: (raw) => (raw as List)
+          .map(
+            (row) => ForumPost.fromMap(Map<String, dynamic>.from(row as Map)),
+          )
+          .toList(growable: false),
+    );
   }
 
   Future<ForumTopic> createTopic({
@@ -130,42 +138,56 @@ class ForumService {
       final bytes = attachment.bytes;
 
       if (bytes == null || bytes.isEmpty) {
+        await _client.from('forum_posts').delete().eq('id', post.id);
         throw Exception('Unable to read the selected file.');
       }
 
       final safeName = _sanitizeFileName(attachment.name);
-
       final path =
           '$classId/${post.id}/${DateTime.now().microsecondsSinceEpoch}_$safeName';
 
-      await _client.storage
-          .from('forum-attachments')
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: attachment.extension != null
+      try {
+        await _client.storage
+            .from('forum-attachments')
+            .uploadBinary(
+              path,
+              bytes,
+              fileOptions: FileOptions(
+                contentType: attachment.extension != null
+                    ? _contentTypeFromExtension(attachment.extension!)
+                    : 'application/octet-stream',
+                upsert: false,
+              ),
+            );
+
+        final updatedRow = await _client
+            .from('forum_posts')
+            .update({
+              'attachment_path': path,
+              'attachment_name': attachment.name,
+              'attachment_type': attachment.extension != null
                   ? _contentTypeFromExtension(attachment.extension!)
                   : 'application/octet-stream',
-              upsert: false,
-            ),
-          );
+              'attachment_size': attachment.size,
+            })
+            .eq('id', post.id)
+            .select()
+            .single();
 
-      final updatedRow = await _client
-          .from('forum_posts')
-          .update({
-            'attachment_path': path,
-            'attachment_name': attachment.name,
-            'attachment_type': attachment.extension != null
-                ? _contentTypeFromExtension(attachment.extension!)
-                : 'application/octet-stream',
-            'attachment_size': attachment.size,
-          })
-          .eq('id', post.id)
-          .select()
-          .single();
-
-      post = ForumPost.fromMap(Map<String, dynamic>.from(updatedRow));
+        post = ForumPost.fromMap(Map<String, dynamic>.from(updatedRow));
+      } catch (_) {
+        try {
+          await _client.storage.from('forum-attachments').remove([path]);
+        } catch (e) {
+          debugPrint('Nettoyage pièce jointe forum impossible: $e');
+        }
+        try {
+          await _client.from('forum_posts').delete().eq('id', post.id);
+        } catch (e) {
+          debugPrint('Nettoyage message forum impossible: $e');
+        }
+        rethrow;
+      }
     }
 
     return post;

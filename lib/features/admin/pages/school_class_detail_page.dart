@@ -29,6 +29,8 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
   List<Map<String, dynamic>> _teachers = [];
   List<Map<String, dynamic>> _availableStudents = [];
   List<Map<String, dynamic>> _availableTeachers = [];
+  List<Map<String, dynamic>> _subjects = [];
+  List<Map<String, dynamic>> _availableSubjects = [];
 
   bool get isFrench => widget.locale.languageCode == 'fr';
 
@@ -47,7 +49,7 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
   void initState() {
     super.initState();
 
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     _loadData();
   }
@@ -70,6 +72,12 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
         _service.listClassTeachers(classId),
         _service.listStudents(),
         _service.listTeachers(),
+        _service.listClassSubjects(classId),
+        _service.listAvailableSubjectsForClass(
+          classId: classId,
+          subsystem: subsystem,
+          sector: sector,
+        ),
       ]);
 
       final students = List<Map<String, dynamic>>.from(results[0] as List);
@@ -79,6 +87,8 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
       final allStudents = List<Map<String, dynamic>>.from(results[2] as List);
 
       final allTeachers = List<Map<String, dynamic>>.from(results[3] as List);
+      final subjects = List<Map<String, dynamic>>.from(results[4] as List);
+      final availableSubjects = List<Map<String, dynamic>>.from(results[5] as List);
 
       final assignedStudentIds = students
           .map((item) => item['student_id'] as String)
@@ -105,6 +115,8 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
           final id = teacher['id'] as String?;
           return id != null && !assignedTeacherIds.contains(id);
         }).toList();
+        _subjects = subjects;
+        _availableSubjects = availableSubjects;
 
         _loading = false;
       });
@@ -260,6 +272,142 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
 
       _showError(e.toString());
     }
+  }
+
+  String _subjectName(Map<String, dynamic> subject) {
+    return isFrench
+        ? (subject['name_fr'] ?? subject['name_en'] ?? '').toString()
+        : (subject['name_en'] ?? subject['name_fr'] ?? '').toString();
+  }
+
+  Future<void> _assignSubject(Map<String, dynamic> subject) async {
+    final subjectId = subject['id']?.toString();
+    if (subjectId == null) return;
+    try {
+      await _service.assignSubjectToClass(
+        classId: classId,
+        subjectId: subjectId,
+        position: _subjects.length,
+      );
+      await _loadData();
+    } catch (error) {
+      if (mounted) _showError(error.toString());
+    }
+  }
+
+  Future<void> _removeSubject(Map<String, dynamic> membership) async {
+    final id = membership['id']?.toString();
+    if (id == null) return;
+    final confirmed = await _confirm(
+      title: isFrench ? 'Retirer la matière' : 'Remove subject',
+      message: isFrench
+          ? 'Retirer ${_subjectName(Map<String, dynamic>.from(membership['subjects'] as Map))} de cette salle ?'
+          : 'Remove ${_subjectName(Map<String, dynamic>.from(membership['subjects'] as Map))} from this classroom?',
+    );
+    if (!confirmed) return;
+    try {
+      await _service.removeSubjectFromClass(id);
+      await _loadData();
+    } catch (error) {
+      if (mounted) _showError(error.toString());
+    }
+  }
+
+  Future<void> _openAddSubjectDialog() async {
+    if (_availableSubjects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isFrench ? 'Toutes les matières compatibles sont déjà dans cette salle.' : 'All compatible subjects are already assigned to this classroom.'),
+      ));
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          itemCount: _availableSubjects.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (_, index) {
+            final subject = _availableSubjects[index];
+            return ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.menu_book_rounded)),
+              title: Text(_subjectName(subject)),
+              subtitle: Text(subject['code']?.toString() ?? ''),
+              trailing: const Icon(Icons.add_circle_rounded, color: Color(0xFF166534)),
+              onTap: () async {
+                Navigator.pop(context);
+                await _assignSubject(subject);
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubjectsTab() {
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: _loadData,
+          child: _subjects.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    const SizedBox(height: 60),
+                    const Icon(Icons.menu_book_outlined, size: 70, color: Colors.grey),
+                    const SizedBox(height: 14),
+                    Text(
+                      isFrench ? 'Aucune matière n’est encore affectée à cette salle.' : 'No subject has been assigned to this classroom yet.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                )
+              : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                  itemCount: _subjects.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, index) {
+                    final membership = _subjects[index];
+                    final subject = membership['subjects'] is Map
+                        ? Map<String, dynamic>.from(membership['subjects'] as Map)
+                        : <String, dynamic>{};
+                    return Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFDCFCE7),
+                          child: Icon(Icons.menu_book_rounded, color: Color(0xFF166534)),
+                        ),
+                        title: Text(_subjectName(subject), style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(subject['code']?.toString() ?? ''),
+                        trailing: IconButton(
+                          tooltip: isFrench ? 'Retirer' : 'Remove',
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          onPressed: () => _removeSubject(membership),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Positioned(
+          right: 20,
+          bottom: 20,
+          child: FloatingActionButton.extended(
+            onPressed: _openAddSubjectDialog,
+            backgroundColor: const Color(0xFF166534),
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(isFrench ? 'Ajouter une matière' : 'Add subject'),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<bool> _confirm({
@@ -579,6 +727,10 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
               icon: const Icon(Icons.person_rounded),
               text: isFrench ? 'Enseignants' : 'Teachers',
             ),
+            Tab(
+              icon: const Icon(Icons.menu_book_rounded),
+              text: isFrench ? 'Matières' : 'Subjects',
+            ),
           ],
         ),
       ),
@@ -593,7 +745,7 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
-                      children: [_buildStudentsTab(), _buildTeachersTab()],
+                      children: [_buildStudentsTab(), _buildTeachersTab(), _buildSubjectsTab()],
                     ),
                   ),
                 ],
