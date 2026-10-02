@@ -58,3 +58,13 @@ app.*.map.json
 
 # Supabase CLI temporary files
 supabase/.temp/
+
+# Flutter generated platform files
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/ephemeral/
+/macos/Flutter/ephemeral/
+/macos/Flutter/Flutter-Generated.xcconfig
+
+# Firebase : fichier propre à votre projet, à fournir par secret GitHub
+android/app/google-services.json

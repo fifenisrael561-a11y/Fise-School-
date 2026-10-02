@@ -438,7 +438,7 @@ class _AiMessage {
 
 extension<T> on Iterable<T> {
   Iterable<T> takeLast(int count) {
-    if (count <= 0) return const <T>[];
+    if (count <= 0) return <T>[];
     final list = toList(growable: false);
     return list.length <= count ? list : list.sublist(list.length - count);
   }

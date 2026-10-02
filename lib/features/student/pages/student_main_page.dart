@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_texts.dart';
 import '../../../models/user_profile.dart';
+import '../../../models/forum.dart';
 import '../../../core/services/forum_service.dart';
 import '../../ai/pages/ai_page.dart';
 import '../../forum/pages/forum_page.dart';
