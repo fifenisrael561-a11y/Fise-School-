@@ -17,6 +17,7 @@ class PublicHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final texts = AppTexts(locale);
     return Scaffold(
+      backgroundColor: const Color(0xFFF6FBF7),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -58,20 +59,30 @@ class PublicHomePage extends StatelessWidget {
         ),
       ],
     );
+
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextButton(
-          onPressed: () => _openAuth(context),
-          child: Text(texts.login),
+        Semantics(
+          label: '${texts.login} dans ${texts.appName}',
+          button: true,
+          child: TextButton(
+            onPressed: () => _openAuth(context),
+            child: Text(texts.login),
+          ),
         ),
         const SizedBox(width: 4),
-        FilledButton(
-          onPressed: () => _openAuth(context, register: true),
-          child: Text(texts.register),
+        Semantics(
+          label: '${texts.register} dans ${texts.appName}',
+          button: true,
+          child: FilledButton(
+            onPressed: () => _openAuth(context, register: true),
+            child: Text(texts.register),
+          ),
         ),
       ],
     );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: narrow
@@ -100,39 +111,47 @@ class PublicHomePage extends StatelessWidget {
     );
   }
 
-  Widget _languageMenu(AppTexts texts) => PopupMenuButton<Locale>(
-    tooltip: texts.language,
-    onSelected: onLanguageChanged,
-    itemBuilder: (_) => [
-      PopupMenuItem(
-        value: const Locale('fr'),
-        child: Text('🇫🇷  ${texts.french}'),
-      ),
-      PopupMenuItem(
-        value: const Locale('en'),
-        child: Text('🇬🇧  ${texts.english}'),
-      ),
-    ],
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFD1E7D7)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(locale.languageCode == 'fr' ? '🇫🇷' : '🇬🇧'),
-          const SizedBox(width: 6),
-          Text(
-            locale.languageCode == 'fr' ? 'FR' : 'EN',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+  Widget _languageMenu(AppTexts texts) => Tooltip(
+        message: texts.language,
+        child: PopupMenuButton<Locale>(
+          tooltip: texts.language,
+          onSelected: onLanguageChanged,
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: const Locale('fr'),
+              child: Text('🇫🇷  ${texts.french}'),
+            ),
+            PopupMenuItem(
+              value: const Locale('en'),
+              child: Text('🇬🇧  ${texts.english}'),
+            ),
+          ],
+          child: Semantics(
+            label: '${texts.language}: ${locale.languageCode == 'fr' ? texts.french : texts.english}',
+            button: true,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0xFFD1E7D7)),
+                color: Colors.white,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(locale.languageCode == 'fr' ? '🇫🇷' : '🇬🇧'),
+                  const SizedBox(width: 6),
+                  Text(
+                    locale.languageCode == 'fr' ? 'FR' : 'EN',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const Icon(Icons.keyboard_arrow_down, size: 18),
+                ],
+              ),
+            ),
           ),
-          const Icon(Icons.keyboard_arrow_down, size: 18),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 
   void _openAuth(BuildContext context, {bool register = false}) {
     Navigator.push(
@@ -182,59 +201,105 @@ class PublicHomePage extends StatelessWidget {
   }
 
   Widget _heroText(AppTexts texts) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.white24,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Text(
-            texts.publicSpace,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+    final isFrench = locale.languageCode == 'fr';
+
+    return Semantics(
+      header: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(30),
             ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          texts.welcome,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 34,
-            height: 1.12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          texts.subtitle,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 17,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                texts.cameroonSystem,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                ),
+            child: Text(
+              isFrench ? 'Espace scolaire' : 'School portal',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            isFrench ? 'Apprendre mieux, partout.' : 'Learn better, anywhere.',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              height: 1.12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            isFrench
+                ? 'Cours, devoirs, leçons et suivi de performance dans une application simple, rapide et accessible.'
+                : 'Courses, assignments, lessons and progress tracking in one simple, fast and accessible app.',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 17,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  isFrench ? 'Disponible hors ligne après téléchargement' : 'Available offline after download',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              Semantics(
+                label: '${texts.login} to ${texts.appName}',
+                button: true,
+                child: FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF166534),
+                    minimumSize: const Size(160, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () => _openAuth(context),
+                  child: Text(texts.login),
+                ),
+              ),
+              Semantics(
+                label: '${texts.register} on ${texts.appName}',
+                button: true,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F3D1F),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(170, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () => _openAuth(context, register: true),
+                  child: Text(texts.register),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -270,7 +335,9 @@ class PublicHomePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            texts.subtitle,
+            isWide
+                ? 'Choisissez votre parcours pour accéder à votre espace.'
+                : 'Choisissez votre parcours.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
           ),
@@ -296,80 +363,88 @@ class PublicHomePage extends StatelessWidget {
     final description = isStudent
         ? texts.studentDescription
         : texts.teacherDescription;
-    return InkWell(
-      borderRadius: BorderRadius.circular(24),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AuthPage(
-            locale: locale,
-            startInRegisterMode: true,
-            initialRole: isStudent ? 'student' : 'teacher',
+    final routeDescription = isStudent
+        ? 'Accéder à l’espace étudiant'
+        : 'Accéder à l’espace enseignant';
+
+    return Semantics(
+      button: true,
+      label: routeDescription,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AuthPage(
+              locale: locale,
+              startInRegisterMode: true,
+              initialRole: isStudent ? 'student' : 'teacher',
+            ),
           ),
         ),
-      ),
-      child: Ink(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFDCEBE0)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EC),
-                borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFDCEBE0)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5EC),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  isStudent ? Icons.school_rounded : Icons.co_present_rounded,
+                  color: const Color(0xFF166534),
+                  size: 30,
+                ),
               ),
-              child: Icon(
-                isStudent ? Icons.school_rounded : Icons.co_present_rounded,
-                color: const Color(0xFF166534),
-                size: 30,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF123524),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF123524),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    description,
-                    style: TextStyle(color: Colors.grey.shade600, height: 1.45),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Text(
-                        texts.continueText,
-                        style: const TextStyle(
-                          color: Color(0xFF166534),
-                          fontWeight: FontWeight.w800,
+                    const SizedBox(height: 7),
+                    Text(
+                      description,
+                      style: TextStyle(color: Colors.grey.shade600, height: 1.45),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          texts.continueText,
+                          style: const TextStyle(
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Color(0xFF166534),
-                        size: 19,
-                      ),
-                    ],
-                  ),
-                ],
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Color(0xFF166534),
+                          size: 19,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -379,7 +454,7 @@ class PublicHomePage extends StatelessWidget {
     final features = [
       (Icons.menu_book_rounded, texts.courses),
       (Icons.assignment_rounded, texts.assignments),
-      (Icons.notifications_rounded, texts.notifications),
+      (Icons.download_rounded, 'Téléchargement local'),
       (Icons.forum_rounded, texts.forum),
     ];
     return Padding(
