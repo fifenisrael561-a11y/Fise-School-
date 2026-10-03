@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_texts.dart';
 import '../../../models/user_profile.dart';
-import '../../ai/pages/ai_page.dart';
 import '../../forum/pages/forum_page.dart';
 import '../../messages/pages/private_messages_page.dart';
 import '../../notifications/pages/notifications_page.dart';
@@ -11,9 +10,6 @@ import '../../settings/pages/profile_page.dart';
 import '../../settings/pages/settings_page.dart';
 import 'assignments_page.dart';
 import 'courses_page.dart';
-import 'daily_lesson_page.dart';
-import 'pages/payment_page.dart';
-import 'pages/premium_page.dart';
 import 'progress_page.dart';
 import 'timetable_page.dart';
 
@@ -32,7 +28,6 @@ class StudentDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texts = AppTexts(locale);
-    final isFrench = locale.languageCode == 'fr';
 
     return _DashboardScaffold(
       title: texts.studentSpace,
@@ -42,266 +37,7 @@ class StudentDashboardPage extends StatelessWidget {
       onSignOut: onSignOut,
       children: [
         _Welcome(profile: profile, texts: texts),
-
-        Card(
-          margin: const EdgeInsets.only(bottom: 18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DailyLessonPage(locale: locale, profile: profile),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.auto_stories_rounded, color: Color(0xFF166534), size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(isFrench ? 'Leçon du jour' : 'Lesson of the day', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 4),
-                        Text(isFrench ? 'Ta prochaine leçon et son exercice selon ton planning.' : 'Your next lesson and exercise based on your timetable.'),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ============================================================
-        // PREMIUM
-        // ============================================================
-        Card(
-          margin: const EdgeInsets.only(bottom: 18),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PremiumPage(locale: locale, profile: profile),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Color(0xFF166534), Color(0xFF15803D)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.workspace_premium_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Fise School Premium',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          isFrench
-                              ? 'Débloque les fonctionnalités et contenus Premium.'
-                              : 'Unlock Premium features and content.',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          isFrench
-                              ? '1000 FCFA / 30 jours'
-                              : '1000 XAF / 30 days',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ============================================================
-        // ASSISTANT IA
-        // ============================================================
-        Card(
-          margin: const EdgeInsets.only(bottom: 18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AiPage(locale: locale, profile: profile),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: Color(0xFF166534),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFrench
-                              ? 'Assistant IA Fise School'
-                              : 'Fise School AI Assistant',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isFrench
-                              ? 'Pose une question sur tes cours et tes révisions.'
-                              : 'Ask a question about your courses and revision.',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ============================================================
-        // PAIEMENT
-        // ============================================================
-        Card(
-          margin: const EdgeInsets.only(bottom: 18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PaymentPage(locale: locale, profile: profile),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.payment_rounded,
-                      color: Color(0xFF166534),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFrench
-                              ? 'Paiements Fise School'
-                              : 'Fise School payments',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isFrench
-                              ? 'Gérer tes paiements et ton abonnement.'
-                              : 'Manage your payments and subscription.',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ============================================================
-        // MENU PRINCIPAL
-        // ============================================================
+        const SizedBox(height: 18),
         _DashboardGrid(
           items: [
             _DashboardItem(
@@ -320,8 +56,7 @@ class StudentDashboardPage extends StatelessWidget {
               () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      AssignmentsPage(locale: locale, profile: profile),
+                  builder: (_) => AssignmentsPage(locale: locale, profile: profile),
                 ),
               ),
             ),
@@ -341,8 +76,7 @@ class StudentDashboardPage extends StatelessWidget {
               () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      PrivateMessagesPage(locale: locale, profile: profile),
+                  builder: (_) => PrivateMessagesPage(locale: locale, profile: profile),
                 ),
               ),
             ),
@@ -352,8 +86,7 @@ class StudentDashboardPage extends StatelessWidget {
               () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      NotificationsPage(locale: locale, userId: profile.id),
+                  builder: (_) => NotificationsPage(locale: locale, userId: profile.id),
                 ),
               ),
             ),
@@ -363,8 +96,7 @@ class StudentDashboardPage extends StatelessWidget {
               () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      ProgressPage(locale: locale, profile: profile),
+                  builder: (_) => ProgressPage(locale: locale, profile: profile),
                 ),
               ),
             ),
@@ -374,24 +106,17 @@ class StudentDashboardPage extends StatelessWidget {
               () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      TimetablePage(locale: locale, profile: profile),
+                  builder: (_) => TimetablePage(locale: locale, profile: profile),
                 ),
               ),
             ),
           ],
         ),
-
         const SizedBox(height: 20),
-
       ],
     );
   }
 }
-
-// ============================================================================
-// SCAFFOLD DU DASHBOARD
-// ============================================================================
 
 class _DashboardScaffold extends StatelessWidget {
   final String title;
@@ -479,10 +204,6 @@ class _DashboardScaffold extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// MESSAGE DE BIENVENUE
-// ============================================================================
-
 class _Welcome extends StatelessWidget {
   final UserProfile profile;
   final AppTexts texts;
@@ -510,10 +231,6 @@ class _Welcome extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// GRILLE DU DASHBOARD
-// ============================================================================
-
 class _DashboardGrid extends StatelessWidget {
   final List<_DashboardItem> items;
 
@@ -533,7 +250,6 @@ class _DashboardGrid extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final item = items[index];
-
         return Card(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -552,10 +268,6 @@ class _DashboardGrid extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-// ÉLÉMENT DU DASHBOARD
-// ============================================================================
 
 class _DashboardItem {
   final IconData icon;

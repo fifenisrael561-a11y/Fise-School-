@@ -86,7 +86,6 @@ class _StudentHome extends StatelessWidget {
         title: const Text('Fise School', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsPage(locale: locale, profile: profile)))),
-          IconButton(icon: const Icon(Icons.logout_rounded), onPressed: onSignOut),
         ],
       ),
       body: ListView(
@@ -98,9 +97,18 @@ class _StudentHome extends StatelessWidget {
           const SizedBox(height: 16),
           _RoomCard(profile: profile, locale: locale),
           const SizedBox(height: 14),
-          _QuickCard(icon: Icons.menu_book_rounded, title: fr ? 'Continuer mes cours' : 'Continue learning', subtitle: fr ? 'Retrouve tes matières et tes leçons.' : 'Open your subjects and lessons.', onTap: () => onOpenTab(1)),
-          _QuickCard(icon: Icons.forum_rounded, title: fr ? 'Forums de ma salle' : 'My class forums', subtitle: fr ? 'Échange avec tes enseignants et camarades.' : 'Talk with teachers and classmates.', onTap: () => onOpenTab(2)),
-          _QuickCard(icon: Icons.auto_awesome_rounded, title: fr ? 'Assistant IA' : 'AI assistant', subtitle: fr ? 'Pose une question, envoie une photo ou un document.' : 'Ask a question, send a photo or a document.', onTap: () => onOpenTab(3)),
+          _QuickCard(
+            icon: Icons.history_edu_rounded,
+            title: fr ? 'Annales d\'examens' : 'Past exam papers',
+            subtitle: fr ? 'Sujets et corrigés des années précédentes.' : 'Papers and corrected exams from previous years.',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PastPapersPage(locale: locale, profile: profile))),
+          ),
+          _QuickCard(
+            icon: Icons.grading_rounded,
+            title: fr ? 'Notes et bulletin' : 'Marks and report card',
+            subtitle: fr ? 'Consulte tes notes, ton rang et exporte ton bulletin en PDF.' : 'See your marks, rank and export your report card.',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulletinPage(locale: locale, profile: profile))),
+          ),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _SmallAction(icon: Icons.notifications_outlined, label: fr ? 'Notifications' : 'Notifications', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsPage(locale: locale, userId: profile.id))))),
@@ -108,8 +116,6 @@ class _StudentHome extends StatelessWidget {
             Expanded(child: _SmallAction(icon: Icons.chat_bubble_outline, label: fr ? 'Messages' : 'Messages', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesHubPage(locale: locale, profile: profile))))),
           ]),
           const SizedBox(height: 8),
-          _QuickCard(icon: Icons.history_edu_rounded, title: fr ? 'Annales d’examens' : 'Past exam papers', subtitle: fr ? 'Sujets et corrigés des années précédentes.' : 'Papers and corrections from previous years.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PastPapersPage(locale: locale)))),
-          _QuickCard(icon: Icons.grading_rounded, title: fr ? 'Notes et bulletin' : 'Marks and report card', subtitle: fr ? 'Consulte tes notes, ton rang et exporte ton bulletin en PDF.' : 'See your marks and rank, and export your report card as PDF.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulletinPage(locale: locale, studentId: profile.id, studentName: '${profile.firstName} ${profile.lastName}'.trim(), className: profile.className)))),
           Row(children: [
             Expanded(child: _SmallAction(icon: Icons.assignment_outlined, label: fr ? 'QCM' : 'Quizzes', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AssignmentsPage(locale: locale, profile: profile))))),
             const SizedBox(width: 10),
@@ -135,7 +141,7 @@ class _RoomCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [const Icon(Icons.school_rounded, color: Color(0xFF166534)), const SizedBox(width: 10), Text(fr ? 'Ma salle' : 'My classroom', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))]),
+          Row(children: [const Icon(Icons.school_rounded, color: Color(0xFF166534)), const SizedBox(width: 10), Text(fr ? 'Ma salle' : 'My classroom', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))]),
           const SizedBox(height: 10),
           FutureBuilder<List<ForumClass>>(
             future: ForumService().listClasses(profile),
@@ -151,10 +157,7 @@ class _RoomCard extends StatelessWidget {
               ]);
             },
           ),
-          if (profile.examLevel != null || profile.subsystem != null) ...[
-            const SizedBox(height: 8),
-            Text([profile.examLevel, profile.subsystem, profile.sector].whereType<String>().where((v) => v.trim().isNotEmpty).join(' • ')),
-          ],
+          if (profile.examLevel != null || profile.subsystem != null) ...[const SizedBox(height: 8), Text([profile.examLevel, profile.subsystem, profile.sector].whereType<String>().where((v) => v.trim().isNotEmpty).join(' • '))],
         ]),
       ),
     );
@@ -162,13 +165,48 @@ class _RoomCard extends StatelessWidget {
 }
 
 class _QuickCard extends StatelessWidget {
-  final IconData icon; final String title; final String subtitle; final VoidCallback onTap;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
   const _QuickCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
-  @override Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), leading: CircleAvatar(backgroundColor: const Color(0xFFDCFCE7), child: Icon(icon, color: const Color(0xFF166534))), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_right_rounded), onTap: onTap));
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 10),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      leading: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: const Color(0xFF166534), size: 24),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+      onTap: onTap,
+    ),
+  );
 }
 
 class _SmallAction extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
   const _SmallAction({required this.icon, required this.label, required this.onTap});
-  @override Widget build(BuildContext context) => Card(child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Padding(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6), child: Column(children: [Icon(icon, color: const Color(0xFF166534)), const SizedBox(height: 7), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))]))));
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: const Color(0xFF166534), size: 24), const SizedBox(height: 8), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))]),
+      ),
+    ),
+  );
 }
