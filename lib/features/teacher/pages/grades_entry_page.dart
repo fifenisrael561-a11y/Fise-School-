@@ -76,14 +76,18 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
           ? await _service.listAllClasses()
           : await ForumService().listClasses(widget.profile!);
       final periods = await _service.listPeriods();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _classes = classes;
         _periods = periods;
         _loading = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = _fr ? 'Chargement impossible. Vérifiez votre connexion.' : 'Unable to load. Check your connection.';
@@ -99,13 +103,19 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
       _roster = const [];
       _disposeControllers();
     });
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     try {
       final subjects = await _service.listClassSubjects(id);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _subjects = subjects);
-    } catch (_) {
-      if (mounted) _snack(_fr ? 'Matières indisponibles.' : 'Subjects unavailable.');
+    } catch (e) {
+      if (mounted) {
+        _snack(_fr ? 'Matières indisponibles.' : 'Subjects unavailable.');
+      }
     }
   }
 
@@ -113,12 +123,16 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
     final classId = _classId;
     final subjectId = _subjectId;
     final periodId = _periodId;
-    if (classId == null || subjectId == null || periodId == null) return;
+    if (classId == null || subjectId == null || periodId == null) {
+      return;
+    }
     setState(() => _loadingGrid = true);
     try {
       final roster = await _service.roster(classId);
       final grades = await _service.listGrades(classId: classId, subjectId: subjectId, periodId: periodId);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _disposeControllers();
       for (final s in roster) {
         final g = grades[s.id];
@@ -129,8 +143,10 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
         _roster = roster;
         _loadingGrid = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() => _loadingGrid = false);
       _snack(_fr ? 'Liste des élèves indisponible.' : 'Student list unavailable.');
     }
@@ -140,13 +156,17 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
     final classId = _classId;
     final subjectId = _subjectId;
     final periodId = _periodId;
-    if (classId == null || subjectId == null || periodId == null) return;
+    if (classId == null || subjectId == null || periodId == null) {
+      return;
+    }
 
     final scores = <String, double>{};
     final comments = <String, String>{};
     for (final s in _roster) {
       final raw = _scores[s.id]?.text.trim().replaceAll(',', '.') ?? '';
-      if (raw.isEmpty) continue;
+      if (raw.isEmpty) {
+        continue;
+      }
       final value = double.tryParse(raw);
       if (value == null || value < 0 || value > 20) {
         _snack(_fr
@@ -170,11 +190,17 @@ class _GradesEntryPageState extends State<GradesEntryPage> {
         scores: scores,
         comments: comments,
       );
-      if (mounted) _snack(_fr ? 'Notes enregistrées.' : 'Marks saved.');
+      if (mounted) {
+        _snack(_fr ? 'Notes enregistrées.' : 'Marks saved.');
+      }
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Échec de l’enregistrement : $e' : 'Save failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Échec de l’enregistrement : $e' : 'Save failed: $e');
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 

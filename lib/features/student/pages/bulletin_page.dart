@@ -50,14 +50,20 @@ class _BulletinPageState extends State<BulletinPage> {
     });
     try {
       final periods = await _service.listPeriods(onlyPublished: widget.onlyPublished);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _periods = periods;
         _loadingPeriods = false;
       });
-      if (periods.isNotEmpty) await _select(periods.last);
-    } catch (_) {
-      if (!mounted) return;
+      if (periods.isNotEmpty) {
+        await _select(periods.last);
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loadingPeriods = false;
         _error = _fr ? 'Impossible de charger les périodes.' : 'Unable to load periods.';
@@ -74,13 +80,17 @@ class _BulletinPageState extends State<BulletinPage> {
     });
     try {
       final bulletin = await _service.bulletin(widget.studentId, period.id);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _bulletin = bulletin;
         _loadingBulletin = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loadingBulletin = false;
         _error = _fr ? 'Bulletin indisponible pour le moment.' : 'Report card unavailable right now.';
@@ -93,7 +103,9 @@ class _BulletinPageState extends State<BulletinPage> {
   Future<void> _pdf() async {
     final b = _bulletin;
     final p = _period;
-    if (b == null || p == null) return;
+    if (b == null || p == null) {
+      return;
+    }
     try {
       await BulletinPdf.share(
         bulletin: b,
@@ -102,8 +114,10 @@ class _BulletinPageState extends State<BulletinPage> {
         periodLabel: p.labelFor(_lang),
         fr: _fr,
       );
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_fr ? 'Création du PDF impossible.' : 'Unable to create the PDF.')),
       );

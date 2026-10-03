@@ -40,14 +40,18 @@ class _ForumPageState extends State<ForumPage> {
     try {
       final classes = await _service.listClasses(widget.profile);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _classes = classes;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;
@@ -59,6 +63,101 @@ class _ForumPageState extends State<ForumPage> {
   }
 
   bool get _isTeacher => widget.profile.role == 'teacher';
+
+  /// L'enseignant choisit les salles qu'il suit (et dans lesquelles il peut créer des forums).
+  Future<void> _chooseMyClasses() async {
+    List<TeacherClassChoice> choices;
+    try {
+      choices = await _service.listTeacherClassChoices();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isFrench ? 'Impossible de charger les salles.' : 'Unable to load classrooms.'),
+      ));
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final selected = <String>{for (final c in choices) if (c.isSelected) c.id};
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _isFrench ? 'Mes salles' : 'My classrooms',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(_isFrench
+                    ? 'Cochez les salles que vous suivez : vous pourrez y créer des forums.'
+                    : 'Tick the classrooms you follow: you will be able to create forums there.'),
+                const SizedBox(height: 8),
+                if (choices.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(_isFrench ? 'Aucune salle disponible pour votre profil.' : 'No classroom available for your profile.'),
+                  )
+                else
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: choices
+                          .map((room) => CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                value: selected.contains(room.id),
+                                title: Text(room.displayName),
+                                onChanged: (value) => setSheetState(() {
+                                  if (value == true) {
+                                    selected.add(room.id);
+                                  } else {
+                                    selected.remove(room.id);
+                                  }
+                                }),
+                              ))
+                          .toList(growable: false),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  child: Text(_isFrench ? 'Enregistrer' : 'Save'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (saved != true) {
+      return;
+    }
+    try {
+      await _service.setTeacherClasses(selected.toList(growable: false));
+      await _loadClasses();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isFrench ? 'Enregistrement impossible.' : 'Unable to save.'),
+      ));
+    }
+  }
 
   Future<void> _createTeacherForum() async {
     ForumClass? selected = _classes.length == 1 ? _classes.first : null;
@@ -94,9 +193,13 @@ class _ForumPageState extends State<ForumPage> {
               onPressed: selected == null || titleController.text.trim().isEmpty ? null : () async {
                 try {
                   await _service.createTopic(classId: selected!.id, authorId: widget.profile.id, authorName: _authorName(widget.profile), title: titleController.text.trim(), description: descriptionController.text.trim());
-                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, true);
+                  }
                 } catch (_) {
-                  if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_isFrench ? 'Impossible de créer le forum.' : 'Unable to create the forum.')));
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_isFrench ? 'Impossible de créer le forum.' : 'Unable to create the forum.')));
+                  }
                 }
               },
               child: Text(_isFrench ? 'Créer' : 'Create'),
@@ -107,7 +210,9 @@ class _ForumPageState extends State<ForumPage> {
     );
     titleController.dispose();
     descriptionController.dispose();
-    if (result == true) await _loadClasses();
+    if (result == true) {
+      await _loadClasses();
+    }
   }
 
   @override
@@ -118,6 +223,14 @@ class _ForumPageState extends State<ForumPage> {
           _isFrench ? 'Forum' : 'Forum',
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [
+          if (_isTeacher)
+            IconButton(
+              tooltip: _isFrench ? 'Mes salles' : 'My classrooms',
+              icon: const Icon(Icons.school_outlined),
+              onPressed: _chooseMyClasses,
+            ),
+        ],
       ),
       floatingActionButton: _isTeacher && _classes.isNotEmpty
           ? FloatingActionButton.extended(
@@ -137,12 +250,36 @@ class _ForumPageState extends State<ForumPage> {
                 onRetry: _loadClasses,
               )
             : _classes.isEmpty
-            ? _EmptyView(
-                icon: Icons.forum_outlined,
-                message: _isFrench
-                    ? 'Aucune classe disponible.'
-                    : 'No class available.',
-              )
+            ? (_isTeacher
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      const SizedBox(height: 48),
+                      const Icon(Icons.school_outlined, size: 56),
+                      const SizedBox(height: 12),
+                      Text(
+                        _isFrench
+                            ? 'Choisissez les salles que vous suivez pour pouvoir créer un forum.'
+                            : 'Choose the classrooms you follow to be able to create a forum.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: FilledButton.icon(
+                          onPressed: _chooseMyClasses,
+                          icon: const Icon(Icons.checklist_rounded),
+                          label: Text(_isFrench ? 'Choisir mes salles' : 'Choose my classrooms'),
+                        ),
+                      ),
+                    ],
+                  )
+                : _EmptyView(
+                    icon: Icons.forum_outlined,
+                    message: _isFrench
+                        ? 'Aucune classe disponible.'
+                        : 'No class available.',
+                  ))
             : ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16),
@@ -234,14 +371,18 @@ class _ForumTopicsPageState extends State<ForumTopicsPage> {
     try {
       final topics = await _service.listTopics(widget.forumClass.id);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _topics = topics;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;
@@ -310,11 +451,15 @@ class _ForumTopicsPageState extends State<ForumTopicsPage> {
                     description: descriptionController.text.trim(),
                   );
 
-                  if (!dialogContext.mounted) return;
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
 
                   Navigator.pop(dialogContext, true);
                 } catch (_) {
-                  if (!dialogContext.mounted) return;
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
 
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
@@ -391,7 +536,9 @@ class _ForumTopicsPageState extends State<ForumTopicsPage> {
       },
     );
 
-    if (action == null) return;
+    if (action == null) {
+      return;
+    }
 
     try {
       switch (action) {
@@ -410,7 +557,9 @@ class _ForumTopicsPageState extends State<ForumTopicsPage> {
 
       await _loadTopics();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -585,7 +734,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     try {
       final posts = await _service.listPosts(widget.topic.id);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _posts = posts;
@@ -594,7 +745,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
 
       _scrollToBottom();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;
@@ -634,7 +787,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     const maxSize = 50 * 1024 * 1024;
 
     if (file.size > maxSize) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -654,7 +809,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
   }
 
   Future<void> _sendPost() async {
-    if (_sending) return;
+    if (_sending) {
+      return;
+    }
 
     final body = _controller.text.trim();
 
@@ -678,7 +835,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
 
       _controller.clear();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _attachment = null;
@@ -686,7 +845,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
 
       await _loadPosts();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -711,7 +872,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
       await _service.deletePost(post);
       await _loadPosts();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -735,7 +898,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     try {
       final url = await _service.createAttachmentSignedUrl(path);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (post.isImage) {
         await showDialog<void>(
@@ -760,7 +925,9 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
         throw Exception('Unable to open attachment');
       }
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

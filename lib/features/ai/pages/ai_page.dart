@@ -51,7 +51,9 @@ class _AiPageState extends State<AiPage> {
     final text = _messageController.text.trim();
     final selectedAttachment = _attachment;
     final contextAttachment = selectedAttachment ?? _conversationAttachment;
-    if ((text.isEmpty && contextAttachment == null) || _sending) return;
+    if ((text.isEmpty && contextAttachment == null) || _sending) {
+      return;
+    }
 
     _messageController.clear();
     final history = _messages
@@ -90,13 +92,17 @@ class _AiPageState extends State<AiPage> {
         attachmentMimeType: contextAttachment?.mimeType,
         attachmentName: contextAttachment?.name,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _messages.add(_AiMessage(text: answer, fromUser: false));
         _sending = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _messages.add(_AiMessage(
           text: _friendlyError(error),
@@ -110,15 +116,21 @@ class _AiPageState extends State<AiPage> {
 
   String _friendlyError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (raw.contains('too large') || raw.contains('Taille')) return raw;
-    if (raw.length <= 220) return raw;
+    if (raw.contains('too large') || raw.contains('Taille')) {
+      return raw;
+    }
+    if (raw.length <= 220) {
+      return raw;
+    }
     return _isFrench
         ? 'Impossible de traiter cette demande. Vérifie ta connexion ou essaie un fichier plus petit.'
         : 'I could not process this request. Check your connection or try a smaller file.';
   }
 
   Future<void> _showAttachmentMenu() async {
-    if (_sending) return;
+    if (_sending) {
+      return;
+    }
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -154,9 +166,13 @@ class _AiPageState extends State<AiPage> {
 
   Future<void> _takePhoto() async {
     final file = await _photoService.takePhoto();
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
     final bytes = await file.readAsBytes();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     _setAttachment(PickedAttachment(
       bytes: bytes,
       name: 'photo-${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -166,9 +182,13 @@ class _AiPageState extends State<AiPage> {
 
   Future<void> _pickImage() async {
     final file = await _photoService.pickFromGallery();
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
     final bytes = await file.readAsBytes();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     _setAttachment(PickedAttachment(
       bytes: bytes,
       name: file.name,
@@ -182,7 +202,9 @@ class _AiPageState extends State<AiPage> {
         'pdf', 'txt', 'md', 'csv',
       ],
     );
-    if (!mounted || file == null) return;
+    if (!mounted || file == null) {
+      return;
+    }
     _setAttachment(file);
   }
 
@@ -344,9 +366,15 @@ class _AiPageState extends State<AiPage> {
   }
 
   IconData _fileIcon(String? mime) {
-    if (mime == 'application/pdf') return Icons.picture_as_pdf_rounded;
-    if (mime?.startsWith('audio/') == true) return Icons.audio_file_rounded;
-    if (mime?.startsWith('video/') == true) return Icons.video_file_rounded;
+    if (mime == 'application/pdf') {
+      return Icons.picture_as_pdf_rounded;
+    }
+    if (mime?.startsWith('audio/') == true) {
+      return Icons.audio_file_rounded;
+    }
+    if (mime?.startsWith('video/') == true) {
+      return Icons.video_file_rounded;
+    }
     return Icons.description_rounded;
   }
 
@@ -438,7 +466,9 @@ class _AiMessage {
 
 extension<T> on Iterable<T> {
   Iterable<T> takeLast(int count) {
-    if (count <= 0) return <T>[];
+    if (count <= 0) {
+      return <T>[];
+    }
     final list = toList(growable: false);
     return list.length <= count ? list : list.sublist(list.length - count);
   }

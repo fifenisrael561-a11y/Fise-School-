@@ -50,7 +50,9 @@ class PrivateMessageService {
       );
     }
 
-    if (body.trim().isEmpty && path == null) return;
+    if (body.trim().isEmpty && path == null) {
+      return;
+    }
 
     await _client.from('private_messages').insert({
       'sender_id': senderId,
@@ -64,7 +66,9 @@ class PrivateMessageService {
   }
 
   Future<String?> signedAttachmentUrl(String? path) async {
-    if (path == null || path.isEmpty) return null;
+    if (path == null || path.isEmpty) {
+      return null;
+    }
     return _client.storage
         .from('private-message-attachments')
         .createSignedUrl(path, 3600);

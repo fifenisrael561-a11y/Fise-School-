@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/offline/offline_repository.dart';
 import '../../../core/services/assignment_service.dart';
 import '../../../models/assignment.dart';
 import '../../../models/user_profile.dart';
@@ -22,6 +23,7 @@ class AssignmentDetailPage extends StatefulWidget {
 
 class _AssignmentDetailPageState extends State<AssignmentDetailPage> {
   final AssignmentService _service = AssignmentService();
+  final OfflineRepository _offline = OfflineRepository();
 
   late Future<List<AssignmentQuestion>> _questionsFuture;
 
@@ -39,74 +41,48 @@ class _AssignmentDetailPageState extends State<AssignmentDetailPage> {
   @override
   void initState() {
     super.initState();
-    _questionsFuture = _service.listQuestions(widget.assignment.id);
+    _questionsFuture = _service.listQuestions(widget.assignment.id, studentId: widget.profile.id);
     _loadSubmission();
   }
 
   Future<void> _loadSubmission() async {
     try {
-      final submission = await _service.getStudentSubmission(
-        assignmentId: widget.assignment.id,
-        studentId: widget.profile.id,
-      );
-
+      final submission = await _service.getStudentSubmission(assignmentId: widget.assignment.id, studentId: widget.profile.id);
       if (!mounted) {
         return;
       }
-
-      setState(() {
-        _submission = submission;
-        _loadingSubmission = false;
-      });
-
+      setState(() { _submission = submission; _loadingSubmission = false; });
       if (submission == null) {
         return;
       }
-
       final answers = await _service.listAnswers(submission.id);
-
-      if (!mounted) {
-        return;
-      }
-
-      for (final answer in answers) {
-        if (answer.answerText != null) {
-          final oldController = _answerControllers[answer.questionId];
-
-          if (oldController == null) {
-            _answerControllers[answer.questionId] = TextEditingController(
-              text: answer.answerText!,
-            );
-          } else {
-            oldController.text = answer.answerText!;
-          }
-        }
-
-        if (answer.selectedOption != null) {
-          _selectedAnswers[answer.questionId] = answer.selectedOption;
-        }
-      }
-
-      setState(() {});
+      await _applyAnswers(answers);
     } catch (_) {
+      final localSubmission = await _offline.getSubmission(widget.profile.id, widget.assignment.id);
       if (!mounted) {
         return;
       }
-
-      setState(() {
-        _loadingSubmission = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEnglish
-                ? 'Unable to load your submission.'
-                : 'Impossible de charger votre réponse.',
-          ),
-        ),
-      );
+      setState(() { _submission = localSubmission; _loadingSubmission = false; });
+      if (localSubmission != null) {
+        await _applyAnswers(await _offline.getAnswers(widget.profile.id, localSubmission.id));
+      }
     }
+  }
+
+  Future<void> _applyAnswers(List<AssignmentAnswer> answers) async {
+    if (!mounted) {
+      return;
+    }
+    for (final answer in answers) {
+      if (answer.answerText != null) {
+        _answerControllers[answer.questionId] ??= TextEditingController();
+        _answerControllers[answer.questionId]!.text = answer.answerText!;
+      }
+      if (answer.selectedOption != null) {
+        _selectedAnswers[answer.questionId] = answer.selectedOption;
+      }
+    }
+    setState(() {});
   }
 
   @override
@@ -122,19 +98,24 @@ class _AssignmentDetailPageState extends State<AssignmentDetailPage> {
     if (_submission != null) {
       return;
     }
-
-    final submission = await _service.createOrGetStudentSubmission(
-      assignmentId: widget.assignment.id,
-      studentId: widget.profile.id,
-    );
-
-    if (!mounted) {
-      return;
+    try {
+      final submission = await _service.createOrGetStudentSubmission(assignmentId: widget.assignment.id, studentId: widget.profile.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _submission = submission);
+    } catch (_) {
+      final now = DateTime.now();
+      final submission = AssignmentSubmission(
+        id: 'local-${widget.assignment.id}-${widget.profile.id}',
+        assignmentId: widget.assignment.id, studentId: widget.profile.id, status: 'draft',
+        createdAt: now, updatedAt: now,
+      );
+      await _offline.saveSubmission(submission, widget.profile.id);
+      if (mounted) {
+        setState(() => _submission = submission);
+      }
     }
-
-    setState(() {
-      _submission = submission;
-    });
   }
 
   Future<void> _saveAnswer(AssignmentQuestion question) async {
@@ -165,12 +146,19 @@ class _AssignmentDetailPageState extends State<AssignmentDetailPage> {
       return;
     }
 
-    await _service.saveAnswer(
-      submissionId: submission.id,
-      questionId: question.id,
-      answerText: hasTextAnswer ? answerText : null,
-      selectedOption: hasSelectedAnswer ? selectedOption : null,
-    );
+    try {
+      await _service.saveAnswer(
+        submissionId: submission.id, questionId: question.id,
+        answerText: hasTextAnswer ? answerText : null,
+        selectedOption: hasSelectedAnswer ? selectedOption : null,
+      );
+    } catch (_) {
+      await _offline.saveAnswer(AssignmentAnswer(
+        id: 'local-${submission.id}-${question.id}', submissionId: submission.id, questionId: question.id,
+        answerText: hasTextAnswer ? answerText : null, selectedOption: hasSelectedAnswer ? selectedOption : null,
+        createdAt: DateTime.now(),
+      ), widget.profile.id);
+    }
   }
 
   Future<void> _saveAllAnswers(List<AssignmentQuestion> questions) async {
@@ -285,17 +273,34 @@ class _AssignmentDetailPageState extends State<AssignmentDetailPage> {
         return;
       }
 
-      final updated = await _service.submitAssignment(
-        submissionId: submission.id,
-      );
+      AssignmentSubmission updated;
+      try {
+        updated = await _service.submitAssignment(submissionId: submission.id);
+      } catch (_) {
+        final answers = <Map<String, dynamic>>[];
+        for (final question in questions) {
+          final controller = _answerControllers[question.id];
+          final selected = _selectedAnswers[question.id];
+          if ((controller?.text.trim().isNotEmpty ?? false) || (selected?.trim().isNotEmpty ?? false)) {
+            answers.add({
+              'question_id': question.id,
+              'answer_text': controller?.text.trim(),
+              'selected_option': selected,
+            });
+          }
+        }
+        await _offline.savePendingAssignment(
+          userId: widget.profile.id, submissionId: submission.id, assignmentId: widget.assignment.id,
+          payload: {'answers': answers},
+        );
+        updated = submission.copyWith(status: 'submitted', submittedAt: DateTime.now(), updatedAt: DateTime.now());
+        await _offline.saveSubmission(updated, widget.profile.id);
+      }
 
       if (!mounted) {
         return;
       }
-
-      setState(() {
-        _submission = updated;
-      });
+      setState(() { _submission = updated; });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

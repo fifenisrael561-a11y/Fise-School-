@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/offline/json_cache.dart';
+import '../../../core/services/smart_course_service.dart';
+import '../../../models/smart_learning.dart';
 import '../../../models/user_profile.dart';
 
 class ProgressPage extends StatefulWidget {
@@ -16,6 +19,7 @@ class ProgressPage extends StatefulWidget {
 
 class _ProgressPageState extends State<ProgressPage> {
   final SupabaseClient _client = Supabase.instance.client;
+  final SmartCourseService _smart = SmartCourseService();
 
   bool _loading = true;
   String? _error;
@@ -27,6 +31,8 @@ class _ProgressPageState extends State<ProgressPage> {
   double _overallProgress = 0;
 
   List<_CourseProgressData> _courses = const [];
+  ClassProgressSummary? _classSummary;
+  List<Map<String, dynamic>> _weekly = const [];
 
   bool get _isFrench => widget.locale.languageCode == 'fr';
 
@@ -43,15 +49,11 @@ class _ProgressPageState extends State<ProgressPage> {
     });
 
     try {
-      final memberships = await JsonCache.instance.cachedRead<List<dynamic>>(
-        key: 'progress_memberships_${widget.profile.id}',
-        fetch: () => _client
-            .from('class_students')
-            .select('class_id')
-            .eq('student_id', widget.profile.id)
-            .eq('is_active', true),
-        decode: (raw) => raw as List,
-      );
+      final memberships = await _client
+          .from('class_students')
+          .select('class_id')
+          .eq('student_id', widget.profile.id)
+          .eq('is_active', true);
 
       final classIds = memberships
           .map((row) => row['class_id']?.toString())
@@ -60,7 +62,9 @@ class _ProgressPageState extends State<ProgressPage> {
           .toList();
 
       if (classIds.isEmpty) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         setState(() {
           _totalLessons = 0;
@@ -74,16 +78,14 @@ class _ProgressPageState extends State<ProgressPage> {
         return;
       }
 
-      final courseRows = await JsonCache.instance.cachedRead<List<dynamic>>(
-        key: 'progress_courses_${widget.profile.id}',
-        fetch: () => _client
-            .from('courses')
-            .select()
-            .eq('status', 'published')
-            .inFilter('class_id', classIds)
-            .order('updated_at', ascending: false),
-        decode: (raw) => raw as List,
-      );
+      unawaited(_loadSmartComparison(classIds.first));
+
+      final courseRows = await _client
+          .from('courses')
+          .select()
+          .eq('status', 'published')
+          .inFilter('class_id', classIds)
+          .order('updated_at', ascending: false);
 
       final List<_CourseProgressData> courseResults = [];
 
@@ -101,16 +103,12 @@ class _ProgressPageState extends State<ProgressPage> {
           continue;
         }
 
-        final lessonsRows = await JsonCache.instance.cachedRead<List<dynamic>>(
-          key: 'progress_lessons_$courseId',
-          fetch: () => _client
-              .from('lessons')
-              .select()
-              .eq('course_id', courseId)
-              .eq('is_published', true)
-              .order('position'),
-          decode: (raw) => raw as List,
-        );
+        final lessonsRows = await _client
+            .from('lessons')
+            .select()
+            .eq('course_id', courseId)
+            .eq('is_published', true)
+            .order('position');
 
         final lessonIds = lessonsRows
             .map((row) => row['id']?.toString())
@@ -122,15 +120,11 @@ class _ProgressPageState extends State<ProgressPage> {
           continue;
         }
 
-        final progressRows = await JsonCache.instance.cachedRead<List<dynamic>>(
-          key: 'progress_rows_${widget.profile.id}_$courseId',
-          fetch: () => _client
-              .from('lesson_progress')
-              .select()
-              .eq('student_id', widget.profile.id)
-              .inFilter('lesson_id', lessonIds),
-          decode: (raw) => raw as List,
-        );
+        final progressRows = await _client
+            .from('lesson_progress')
+            .select()
+            .eq('student_id', widget.profile.id)
+            .inFilter('lesson_id', lessonIds);
 
         final progressByLesson = <String, Map<String, dynamic>>{};
 
@@ -140,21 +134,6 @@ class _ProgressPageState extends State<ProgressPage> {
 
           if (lessonId != null && lessonId.isNotEmpty) {
             progressByLesson[lessonId] = progress;
-          }
-        }
-
-        // Progression faite hors ligne et pas encore envoyée : elle prime
-        // sur la copie du serveur si la leçon est terminée localement.
-        for (final lessonId in lessonIds) {
-          final local = await JsonCache.instance.read(
-            'progress_${widget.profile.id}_$lessonId',
-          );
-          if (local is Map) {
-            final localProgress = Map<String, dynamic>.from(local);
-            if (localProgress['status'] == 'completed' ||
-                !progressByLesson.containsKey(lessonId)) {
-              progressByLesson[lessonId] = localProgress;
-            }
           }
         }
 
@@ -210,7 +189,9 @@ class _ProgressPageState extends State<ProgressPage> {
           ? 0.0
           : progressSum / progressCount;
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _totalLessons = totalLessons;
@@ -220,8 +201,10 @@ class _ProgressPageState extends State<ProgressPage> {
         _courses = courseResults;
         _loading = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;
@@ -229,6 +212,22 @@ class _ProgressPageState extends State<ProgressPage> {
             ? 'Impossible de charger votre progression.'
             : 'Unable to load your progress.';
       });
+    }
+  }
+
+  Future<void> _loadSmartComparison(String classId) async {
+    try {
+      final summary = await _smart.getClassProgressSummary(classId);
+      final weekly = await _smart.getWeeklyProgress(classId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _classSummary = summary;
+        _weekly = weekly;
+      });
+    } catch (_) {
+      // Existing progress remains available if the comparison RPC is not ready.
     }
   }
 
@@ -346,6 +345,10 @@ class _ProgressPageState extends State<ProgressPage> {
                     _buildOverallCard(theme),
                     const SizedBox(height: 16),
                     _buildStats(),
+                    if (_classSummary != null || _weekly.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      _buildSmartProgressSection(),
+                    ],
                     const SizedBox(height: 20),
                     Text(
                       _isFrench
@@ -366,6 +369,75 @@ class _ProgressPageState extends State<ProgressPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildSmartProgressSection() {
+    final summary = _classSummary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_isFrench ? 'Votre évolution' : 'Your progress over time', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 10),
+        Card(
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: SizedBox(
+              height: 150,
+              child: _weekly.isEmpty
+                  ? Center(child: Text(_isFrench ? 'Pas encore assez de données.' : 'Not enough data yet.'))
+                  : CustomPaint(painter: _WeeklyProgressPainter(_weekly)),
+            ),
+          ),
+        ),
+        if (summary != null) ...[
+          const SizedBox(height: 12),
+          Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: summary.comparisonAvailable
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_isFrench ? 'Position dans la salle' : 'Position in your class', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      Text(_frTop(summary.topPercent)),
+                      const SizedBox(height: 8),
+                      Text(_isFrench
+                          ? 'Votre moyenne : ${summary.ownAverageScore.toStringAsFixed(1)} % • moyenne de la salle : ${summary.classAverageScore.toStringAsFixed(1)} %'
+                          : 'Your average: ${summary.ownAverageScore.toStringAsFixed(1)}% • class average: ${summary.classAverageScore.toStringAsFixed(1)}%'),
+                      const SizedBox(height: 10),
+                      ...summary.subjects.map((subject) {
+                        final own = (subject['own_score'] as num?)?.toDouble() ?? 0;
+                        final average = (subject['class_average'] as num?)?.toDouble() ?? 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text('${subject['subject_name'] ?? ''}: ${own.toStringAsFixed(0)} % / ${average.toStringAsFixed(0)} %'),
+                        );
+                      }),
+                    ])
+                  : Text(_isFrench
+                      ? 'La comparaison est masquée pour les salles de moins de 5 élèves actifs.'
+                      : 'Comparison is hidden for classes with fewer than 5 active students.'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _frTop(int? topPercent) {
+    if (topPercent == null) {
+      return _isFrench ? 'Continuez à progresser à votre rythme.' : 'Keep progressing at your own pace.';
+    }
+    if (topPercent > 50) {
+      return _isFrench
+          ? 'Votre progression continue : utilisez les leçons et exercices pour avancer.'
+          : 'Your progress can keep growing: use the lessons and exercises to move forward.';
+    }
+    if (_isFrench) {
+      return 'Vous êtes dans les $topPercent % meilleurs élèves de la salle.';
+    }
+    return 'You are in the top $topPercent% of students in the class.';
   }
 
   Widget _buildOverallCard(ThemeData theme) {
@@ -586,6 +658,36 @@ class _CourseProgressData {
     required this.inProgressLessons,
     required this.progressPercent,
   });
+}
+
+class _WeeklyProgressPainter extends CustomPainter {
+  final List<Map<String, dynamic>> points;
+  const _WeeklyProgressPainter(this.points);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) {
+      return;
+    }
+    final line = Paint()..strokeWidth = 3..style = PaintingStyle.stroke;
+    final dot = Paint()..style = PaintingStyle.fill;
+    final path = Path();
+    for (var i = 0; i < points.length; i++) {
+      final score = ((points[i]['average_score'] as num?)?.toDouble() ?? 0).clamp(0, 100);
+      final x = points.length == 1 ? size.width / 2 : i * size.width / (points.length - 1);
+      final y = size.height - (score / 100) * (size.height - 10);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+      canvas.drawCircle(Offset(x, y), 4, dot);
+    }
+    canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WeeklyProgressPainter oldDelegate) => oldDelegate.points != points;
 }
 
 class _StatCard extends StatelessWidget {

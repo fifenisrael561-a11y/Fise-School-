@@ -49,7 +49,9 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
           if (selected != null && (row['sender_id'] == selected.id || row['recipient_id'] == selected.id)) {
             _select(selected);
           }
-          if (mounted) setState(() => _contactsFuture = _service.listContacts());
+          if (mounted) {
+            setState(() => _contactsFuture = _service.listContacts());
+          }
         }
       })
       .subscribe();
@@ -70,17 +72,25 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
     try {
       final messages = await _service.listConversation(contact.id);
       await _service.markConversationRead(contact.id);
-      if (mounted) setState(() => _messages = messages);
+      if (mounted) {
+        setState(() => _messages = messages);
+      }
     } finally {
-      if (mounted) setState(() => _loadingMessages = false);
+      if (mounted) {
+        setState(() => _loadingMessages = false);
+      }
     }
   }
 
   Future<void> _send() async {
     final contact = _selected;
     final body = _composer.text.trim();
-    if (contact == null || _sending) return;
-    if (body.isEmpty && _attachment == null) return;
+    if (contact == null || _sending) {
+      return;
+    }
+    if (body.isEmpty && _attachment == null) {
+      return;
+    }
 
     setState(() => _sending = true);
     try {
@@ -92,18 +102,26 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
         attachmentType: _attachment?.mimeType,
       );
       _composer.clear();
-      if (mounted) setState(() => _attachment = null);
+      if (mounted) {
+        setState(() => _attachment = null);
+      }
       await _select(contact);
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _sending = false);
+      }
     }
   }
 
   Future<void> _takePhoto() async {
     final file = await _photoService.takePhoto();
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
     final bytes = await file.readAsBytes();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _attachment = PickedAttachment(
         bytes: bytes,
@@ -117,7 +135,9 @@ class _PrivateMessagesPageState extends State<PrivateMessagesPage> {
     final attachment = await _photoService.pickFile(
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'mp4', 'mp3', 'm4a'],
     );
-    if (attachment != null && mounted) setState(() => _attachment = attachment);
+    if (attachment != null && mounted) {
+      setState(() => _attachment = attachment);
+    }
   }
 
   @override
@@ -379,7 +399,9 @@ class _MessageAttachment extends StatelessWidget {
           child: TextButton.icon(
             onPressed: () async {
               final uri = Uri.tryParse(url);
-              if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (uri != null) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
             },
             icon: const Icon(Icons.attach_file_rounded),
             label: Text(message.attachmentName ?? (isFrench ? 'Fichier' : 'File')),

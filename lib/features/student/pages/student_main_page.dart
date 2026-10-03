@@ -14,7 +14,7 @@ import '../pages/progress_page.dart';
 import '../pages/timetable_page.dart';
 import '../pages/past_papers_page.dart';
 import '../pages/bulletin_page.dart';
-import '../../messages/pages/private_messages_page.dart';
+import '../../messages/pages/messages_hub_page.dart';
 import '../../notifications/pages/notifications_page.dart';
 
 class StudentMainPage extends StatefulWidget {
@@ -105,7 +105,7 @@ class _StudentHome extends StatelessWidget {
           Row(children: [
             Expanded(child: _SmallAction(icon: Icons.notifications_outlined, label: fr ? 'Notifications' : 'Notifications', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsPage(locale: locale, userId: profile.id))))),
             const SizedBox(width: 10),
-            Expanded(child: _SmallAction(icon: Icons.chat_bubble_outline, label: fr ? 'Messages' : 'Messages', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivateMessagesPage(locale: locale, profile: profile))))),
+            Expanded(child: _SmallAction(icon: Icons.chat_bubble_outline, label: fr ? 'Messages' : 'Messages', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesHubPage(locale: locale, profile: profile))))),
           ]),
           const SizedBox(height: 8),
           _QuickCard(icon: Icons.history_edu_rounded, title: fr ? 'Annales d’examens' : 'Past exam papers', subtitle: fr ? 'Sujets et corrigés des années précédentes.' : 'Papers and corrections from previous years.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PastPapersPage(locale: locale)))),

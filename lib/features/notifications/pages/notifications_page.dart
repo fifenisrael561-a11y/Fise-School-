@@ -89,7 +89,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 isThreeLine: true,
                 onTap: () async {
                   await _service.markRead(item.id);
-                  if (mounted) setState(() => _future = _service.listForUser(widget.userId));
+                  if (mounted) {
+                    setState(() => _future = _service.listForUser(widget.userId));
+                  }
                 },
               );
             },

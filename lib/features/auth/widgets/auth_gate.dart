@@ -35,7 +35,6 @@ class _AuthGateState extends State<AuthGate> {
   int _eventCount = 0;
   StreamSubscription<bool>? _connectivitySubscription;
   String? _syncedStudentId;
-  bool _syncing = false;
 
   @override
   void initState() {
@@ -46,17 +45,9 @@ class _AuthGateState extends State<AuthGate> {
       _updateState(state);
     });
     _load();
-    _connectivitySubscription = ConnectivityService().connectionStream.listen((
-      online,
-    ) {
-      final profile = _state.profile;
-      if (online &&
-          _state.status == SessionStatus.authenticated &&
-          profile != null &&
-          profile.role.toLowerCase() == 'student') {
-        // Retour du réseau : on envoie la progression en attente et on
-        // rafraîchit le cache.
-        _syncStudentOfflineCache(profile, force: true);
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((online) {
+      if (online && _state.status == SessionStatus.authenticated) {
+        _syncStudentOfflineCache(_state.profile!);
       }
     });
   }
@@ -66,12 +57,16 @@ class _AuthGateState extends State<AuthGate> {
     final state = await widget.sessionService.load();
     // Un événement d'authentification plus récent a déjà mis l'état à jour :
     // on ignore ce résultat ancien pour ne pas revenir à l'accueil.
-    if (_eventCount != eventsBefore) return;
+    if (_eventCount != eventsBefore) {
+      return;
+    }
     _updateState(state);
   }
 
   void _updateState(SessionState state) {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _state = state;
@@ -89,26 +84,21 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
-  Future<void> _syncStudentOfflineCache(
-    UserProfile profile, {
-    bool force = false,
-  }) async {
-    if (_syncing) return;
-    if (!force && _syncedStudentId == profile.id) return;
-    _syncing = true;
+  Future<void> _syncStudentOfflineCache(UserProfile profile) async {
     try {
-      // Sans réseau on ne marque rien comme « synchronisé » : la prochaine
-      // reconnexion relancera la synchronisation.
-      if (!await ConnectivityService().isOnline()) return;
+      if (!await ConnectivityService().isOnline()) {
+        return;
+      }
       final sync = SyncService();
-      await sync.flushPending();
-      await sync.syncStudentCourses(profile.id);
-      await sync.syncStudentExtras(profile);
+      await sync.syncPendingAssignments(profile.id);
+      await sync.syncPendingSmartExercises(profile.id);
+      if (_syncedStudentId == profile.id) {
+        return;
+      }
       _syncedStudentId = profile.id;
+      await sync.syncStudentCourses(profile.id);
     } catch (_) {
       // The app remains usable with whatever cache is already available.
-    } finally {
-      _syncing = false;
     }
   }
 

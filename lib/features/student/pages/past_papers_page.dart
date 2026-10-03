@@ -53,14 +53,18 @@ class _PastPapersPageState extends State<PastPapersPage> {
       } catch (_) {
         // Les noms d'examens sont facultatifs : la liste reste utilisable.
       }
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _papers = papers;
         _exams = exams;
         _loading = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = _fr
             ? 'Impossible de charger les annales. Vérifiez votre connexion.'
@@ -74,9 +78,13 @@ class _PastPapersPageState extends State<PastPapersPage> {
     try {
       final url = await _service.signedUrl(paper.filePath);
       final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      if (!ok && mounted) _snack(_fr ? 'Aucune application pour ouvrir ce fichier.' : 'No app can open this file.');
+      if (!ok && mounted) {
+        _snack(_fr ? 'Aucune application pour ouvrir ce fichier.' : 'No app can open this file.');
+      }
     } catch (_) {
-      if (mounted) _snack(_fr ? 'Impossible d’ouvrir ce fichier.' : 'Unable to open this file.');
+      if (mounted) {
+        _snack(_fr ? 'Impossible d’ouvrir ce fichier.' : 'Unable to open this file.');
+      }
     }
   }
 
@@ -86,8 +94,12 @@ class _PastPapersPageState extends State<PastPapersPage> {
   List<PastPaper> get _filtered {
     final q = _search.text.trim().toLowerCase();
     return _papers.where((p) {
-      if (_examId != null && p.examId != _examId) return false;
-      if (_year != null && p.year != _year) return false;
+      if (_examId != null && p.examId != _examId) {
+        return false;
+      }
+      if (_year != null && p.year != _year) {
+        return false;
+      }
       if (q.isNotEmpty &&
           !p.subjectFr.toLowerCase().contains(q) &&
           !p.subjectEn.toLowerCase().contains(q)) {

@@ -4,8 +4,10 @@ import '../../../core/localization/app_texts.dart';
 import '../../../core/services/pedagogy_service.dart';
 import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
-import 'course_detail_page.dart';
+import 'subject_channel_page.dart';
 
+/// Espace Cours de l'élève : les matières de sa salle, selon le programme du
+/// Cameroun. Chaque matière ouvre son fil de cours, documents et QCM.
 class CoursesPage extends StatefulWidget {
   final Locale locale;
   final UserProfile profile;
@@ -20,10 +22,55 @@ class _CoursesPageState extends State<CoursesPage> {
   final CourseService _service = CourseService();
   late Future<List<ClassSubjectEntry>> _subjectsFuture;
 
+  static const _palette = <Color>[
+    Color(0xFF166534),
+    Color(0xFF1D4ED8),
+    Color(0xFFB45309),
+    Color(0xFF7C3AED),
+    Color(0xFFBE123C),
+    Color(0xFF0E7490),
+  ];
+
+  bool get _fr => widget.locale.languageCode == 'fr';
+
   @override
   void initState() {
     super.initState();
     _subjectsFuture = _service.listClassSubjects(widget.profile);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _subjectsFuture = _service.listClassSubjects(widget.profile));
+    await _subjectsFuture;
+  }
+
+  IconData _iconFor(Subject subject) {
+    final code = subject.code.toLowerCase();
+    if (code.contains('math')) {
+      return Icons.calculate_rounded;
+    }
+    if (code.contains('franc') || code.contains('french')) {
+      return Icons.translate_rounded;
+    }
+    if (code.contains('angl') || code.contains('english')) {
+      return Icons.language_rounded;
+    }
+    if (code.contains('hist')) {
+      return Icons.history_edu_rounded;
+    }
+    if (code.contains('geo')) {
+      return Icons.public_rounded;
+    }
+    if (code.contains('civ') || code.contains('citizen')) {
+      return Icons.balance_rounded;
+    }
+    if (code.contains('science') || code.contains('phys') || code.contains('chim')) {
+      return Icons.science_rounded;
+    }
+    if (code.contains('dessin') || code.contains('workshop') || code.contains('techno')) {
+      return Icons.construction_rounded;
+    }
+    return Icons.menu_book_rounded;
   }
 
   @override
@@ -43,187 +90,92 @@ class _CoursesPageState extends State<CoursesPage> {
             return _Message(texts.pedagogyLoadError);
           }
 
-          final subjects = snapshot.data ?? const <ClassSubjectEntry>[];
+          final entries = snapshot.data ?? const <ClassSubjectEntry>[];
 
-          if (subjects.isEmpty) {
+          if (entries.isEmpty) {
             return _Message(texts.noCoursesYet);
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: subjects.length + 1,
-            separatorBuilder: (_, index) => const SizedBox(height: 12),
-            itemBuilder: (_, index) {
-              if (index == 0) {
-                return Card(
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
                   child: ListTile(
                     leading: const Icon(Icons.school_rounded, color: Color(0xFF166534)),
-                    title: Text(widget.profile.className ?? (widget.locale.languageCode == 'fr' ? 'Ma classe' : 'My class')),
-                    subtitle: Text(widget.locale.languageCode == 'fr'
-                        ? 'Matières et options correspondant à ton sous-système et à ta classe.'
-                        : 'Subjects and options matching your subsystem and class.'),
+                    title: Text(
+                      widget.profile.className ?? (_fr ? 'Ma classe' : 'My class'),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      _fr
+                          ? 'Choisis une matière pour voir les cours et les QCM de ton enseignant.'
+                          : 'Pick a subject to see your teacher’s courses and quizzes.',
+                    ),
                   ),
-                );
-              }
-              final entry = subjects[index - 1];
-              return _SubjectTile(
-                entry: entry,
-                subject: entry.subject,
-                locale: widget.locale,
-                service: _service,
-                studentId: widget.profile.id,
-              );
-            },
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: entries.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.15,
+                  ),
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    final color = _palette[index % _palette.length];
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SubjectChannelPage(
+                            locale: widget.locale,
+                            profile: widget.profile,
+                            subject: entry.subject,
+                          ),
+                        ),
+                      ),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: color.withValues(alpha: 0.35)),
+                        ),
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: color,
+                              child: Icon(_iconFor(entry.subject), color: Colors.white),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              entry.subject.labelFor(widget.locale.languageCode),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           );
         },
       ),
     );
-  }
-}
-
-class _SubjectTile extends StatelessWidget {
-  final ClassSubjectEntry entry;
-  final Subject subject;
-  final Locale locale;
-  final CourseService service;
-  final String studentId;
-
-  const _SubjectTile({
-    required this.entry,
-    required this.subject,
-    required this.locale,
-    required this.service,
-    required this.studentId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final texts = AppTexts(locale);
-
-    return Card(
-      child: ExpansionTile(
-        leading: const Icon(Icons.menu_book_rounded, color: Color(0xFF166534)),
-        title: Text(
-          subject.labelFor(locale.languageCode),
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(
-          entry.isCompulsory
-              ? (locale.languageCode == 'fr' ? 'Matière obligatoire • ${subject.code}' : 'Compulsory • ${subject.code}')
-              : '${entry.optionGroup ?? (locale.languageCode == 'fr' ? 'Option' : 'Option')} • ${subject.code}',
-        ),
-        children: [
-          FutureBuilder<List<Curriculum>>(
-            future: service.listCurricula(subject.id),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return _InlineMessage(texts.pedagogyLoadError);
-              }
-
-              final curricula = snapshot.data ?? const <Curriculum>[];
-
-              if (curricula.isEmpty) {
-                return _InlineMessage(texts.noCurriculumYet);
-              }
-
-              return Column(
-                children: curricula
-                    .map(
-                      (curriculum) => _CurriculumTile(
-                        curriculum: curriculum,
-                        locale: locale,
-                        service: service,
-                        studentId: studentId,
-                      ),
-                    )
-                    .toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CurriculumTile extends StatelessWidget {
-  final Curriculum curriculum;
-  final Locale locale;
-  final CourseService service;
-  final String studentId;
-
-  const _CurriculumTile({
-    required this.curriculum,
-    required this.locale,
-    required this.service,
-    required this.studentId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final texts = AppTexts(locale);
-
-    return FutureBuilder<List<Course>>(
-      future: service.listStudentCourses(
-        studentId,
-        subjectId: curriculum.subjectId,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const LinearProgressIndicator();
-        }
-
-        if (snapshot.hasError) {
-          return _InlineMessage(texts.pedagogyLoadError);
-        }
-
-        final courses = (snapshot.data ?? const <Course>[])
-            .where((course) => course.curriculumId == curriculum.id)
-            .toList();
-
-        return ExpansionTile(
-          title: Text(curriculum.labelFor(locale.languageCode)),
-          subtitle: Text(curriculum.descriptionFor(locale.languageCode) ?? ''),
-          children: courses.isEmpty
-              ? [_InlineMessage(texts.noPublishedCourses)]
-              : courses
-                    .map(
-                      (course) => ListTile(
-                        leading: const Icon(Icons.play_lesson_outlined),
-                        title: Text(course.labelFor(locale.languageCode)),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CourseDetailPage(
-                              locale: locale,
-                              profile: _getProfile(context),
-                              course: course,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-        );
-      },
-    );
-  }
-
-  UserProfile _getProfile(BuildContext context) {
-    final coursesPage = context.findAncestorWidgetOfExactType<CoursesPage>();
-
-    if (coursesPage == null) {
-      throw StateError('CoursesPage introuvable dans l’arbre des widgets.');
-    }
-
-    return coursesPage.profile;
   }
 }
 
@@ -239,19 +191,4 @@ class _Message extends StatelessWidget {
       child: Text(message, textAlign: TextAlign.center),
     ),
   );
-}
-
-class _InlineMessage extends StatelessWidget {
-  final String message;
-
-  const _InlineMessage(this.message);
-
-  @override
-  Widget build(BuildContext context) =>
-      Padding(padding: const EdgeInsets.all(16), child: Text(message));
-}
-
-extension on Curriculum {
-  String? descriptionFor(String languageCode) =>
-      languageCode == 'en' ? descriptionEn : descriptionFr;
 }

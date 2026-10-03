@@ -2,7 +2,8 @@ import 'dart:ui';
 
 class Assignment {
   final String id;
-  final String courseId;
+  final String? courseId;
+  final String? subjectId;
   final String? lessonId;
   final String teacherId;
   final String classId;
@@ -19,7 +20,8 @@ class Assignment {
 
   const Assignment({
     required this.id,
-    required this.courseId,
+    this.courseId,
+    this.subjectId,
     this.lessonId,
     required this.teacherId,
     required this.classId,
@@ -38,7 +40,8 @@ class Assignment {
   factory Assignment.fromMap(Map<String, dynamic> map) {
     return Assignment(
       id: map['id'] as String,
-      courseId: map['course_id'] as String,
+      courseId: map['course_id'] as String?,
+      subjectId: map['subject_id'] as String?,
       lessonId: map['lesson_id'] as String?,
       teacherId: map['teacher_id'] as String,
       classId: map['class_id'] as String,
@@ -59,6 +62,7 @@ class Assignment {
     return {
       'id': id,
       'course_id': courseId,
+      'subject_id': subjectId,
       'lesson_id': lessonId,
       'teacher_id': teacherId,
       'class_id': classId,
@@ -86,6 +90,7 @@ class Assignment {
   Assignment copyWith({
     String? id,
     String? courseId,
+    String? subjectId,
     String? lessonId,
     String? teacherId,
     String? classId,
@@ -103,6 +108,7 @@ class Assignment {
     return Assignment(
       id: id ?? this.id,
       courseId: courseId ?? this.courseId,
+      subjectId: subjectId ?? this.subjectId,
       lessonId: lessonId ?? this.lessonId,
       teacherId: teacherId ?? this.teacherId,
       classId: classId ?? this.classId,

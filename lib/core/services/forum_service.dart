@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/forum.dart';
 import '../../models/user_profile.dart';
-import '../offline/json_cache.dart';
 
 class ForumService {
   final SupabaseClient _client;
@@ -12,75 +11,82 @@ class ForumService {
   ForumService({SupabaseClient? client})
     : _client = client ?? Supabase.instance.client;
 
-  Future<List<ForumClass>> listClasses(UserProfile profile) {
-    return JsonCache.instance.cachedRead<List<ForumClass>>(
-      key: 'forum_classes_${profile.role}_${profile.id}',
-      fetch: () => _fetchClassRows(profile),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) => ForumClass.fromMap(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList(growable: false),
-    );
-  }
-
-  /// Retourne des lignes [{id, name, display_name}] (déjà aplaties pour
-  /// pouvoir être conservées telles quelles dans le cache).
-  Future<List<dynamic>> _fetchClassRows(UserProfile profile) async {
-    final String table;
-    final String column;
+  Future<List<ForumClass>> listClasses(UserProfile profile) async {
     if (profile.role == 'student') {
-      table = 'class_students';
-      column = 'student_id';
-    } else if (profile.role == 'teacher') {
-      table = 'class_teachers';
-      column = 'teacher_id';
-    } else {
-      return const <dynamic>[];
+      final rows = await _client
+          .from('class_students')
+          .select('class_id, school_classes(id, name, display_name)')
+          .eq('student_id', profile.id)
+          .eq('is_active', true);
+
+      return rows
+          .map((row) {
+            final data = Map<String, dynamic>.from(
+              row['school_classes'] as Map,
+            );
+
+            return ForumClass.fromMap(data);
+          })
+          .toList(growable: false);
     }
 
-    final rows = await _client
-        .from(table)
-        .select('class_id, school_classes(id, name, display_name)')
-        .eq(column, profile.id)
-        .eq('is_active', true);
+    if (profile.role == 'teacher') {
+      final rows = await _client
+          .from('class_teachers')
+          .select('class_id, school_classes(id, name, display_name)')
+          .eq('teacher_id', profile.id)
+          .eq('is_active', true);
 
-    return rows
-        .map((row) => Map<String, dynamic>.from(row['school_classes'] as Map))
+      return rows
+          .map((row) {
+            final data = Map<String, dynamic>.from(
+              row['school_classes'] as Map,
+            );
+
+            return ForumClass.fromMap(data);
+          })
+          .toList(growable: false);
+    }
+
+    return const [];
+  }
+
+  /// Salles que l'enseignant peut choisir de suivre, avec l'état de sélection.
+  Future<List<TeacherClassChoice>> listTeacherClassChoices() async {
+    final rows = await _client.rpc('list_classes_for_teacher_choice');
+    return (rows as List)
+        .map((row) => TeacherClassChoice.fromMap(Map<String, dynamic>.from(row as Map)))
         .toList(growable: false);
   }
 
-  Future<List<ForumTopic>> listTopics(String classId) {
-    return JsonCache.instance.cachedRead<List<ForumTopic>>(
-      key: 'forum_topics_$classId',
-      fetch: () => _client
-          .from('forum_topics')
-          .select()
-          .eq('class_id', classId)
-          .order('is_pinned', ascending: false)
-          .order('created_at', ascending: false),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) => ForumTopic.fromMap(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList(growable: false),
-    );
+  /// Remplace l'ensemble des salles suivies par l'enseignant connecté.
+  Future<void> setTeacherClasses(List<String> classIds) async {
+    await _client.rpc('teacher_set_my_classes', params: {'p_class_ids': classIds});
   }
 
-  Future<List<ForumPost>> listPosts(String topicId) {
-    return JsonCache.instance.cachedRead<List<ForumPost>>(
-      key: 'forum_posts_$topicId',
-      fetch: () => _client
-          .from('forum_posts')
-          .select()
-          .eq('topic_id', topicId)
-          .order('created_at', ascending: true),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) => ForumPost.fromMap(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList(growable: false),
-    );
+  Future<List<ForumTopic>> listTopics(String classId) async {
+    final rows = await _client
+        .from('forum_topics')
+        .select()
+        .eq('class_id', classId)
+        .order('is_pinned', ascending: false)
+        .order('created_at', ascending: false);
+
+    return rows
+        .map((row) => ForumTopic.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
+  }
+
+  Future<List<ForumPost>> listPosts(String topicId) async {
+    final rows = await _client
+        .from('forum_posts')
+        .select()
+        .eq('topic_id', topicId)
+        .order('created_at', ascending: true);
+
+    return rows
+        .map((row) => ForumPost.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
   }
 
   Future<ForumTopic> createTopic({

@@ -7,7 +7,9 @@ class ProfileService {
 
   Future<UserProfile?> getCurrentProfile() async {
     final user = _client.auth.currentUser;
-    if (user == null) return null;
+    if (user == null) {
+      return null;
+    }
 
     final data = await _client
         .from('profiles')
@@ -24,7 +26,9 @@ class ProfileService {
     required String preferredLanguage,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw const AuthException('No active user session.');
+    if (user == null) {
+      throw const AuthException('No active user session.');
+    }
     final data = await _client
         .from('profiles')
         .update({

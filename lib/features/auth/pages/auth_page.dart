@@ -76,7 +76,9 @@ class _AuthPageState extends State<AuthPage> {
       _tracks = const [];
       _catalogError = false;
     });
-    if (subsystem == null || sector == null) return;
+    if (subsystem == null || sector == null) {
+      return;
+    }
 
     setState(() => _loadingLevels = true);
     try {
@@ -84,7 +86,9 @@ class _AuthPageState extends State<AuthPage> {
         subsystem: subsystem,
         sector: sector,
       );
-      if (!mounted || subsystem != _subsystem || sector != _sector) return;
+      if (!mounted || subsystem != _subsystem || sector != _sector) {
+        return;
+      }
       setState(() => _levels = levels);
     } catch (_) {
       if (mounted && subsystem == _subsystem && sector == _sector) {
@@ -107,7 +111,9 @@ class _AuthPageState extends State<AuthPage> {
       final tracks = level.sector == ExamSector.general
           ? await _catalog.getSeriesForLevel(level.id)
           : await _catalog.getSpecialtiesForLevel(level.id);
-      if (!mounted || _level?.id != level.id) return;
+      if (!mounted || _level?.id != level.id) {
+        return;
+      }
       setState(() => _tracks = tracks);
     } catch (_) {
       // Série/spécialité facultative : une erreur ne bloque pas l'inscription.
@@ -115,7 +121,9 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _submit(AppTexts texts) async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       var signedIn = true;
@@ -145,7 +153,9 @@ class _AuthPageState extends State<AuthPage> {
           password: _passwordController.text,
         );
       }
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       final message = !_isRegistering
           ? texts.login
@@ -163,11 +173,17 @@ class _AuthPageState extends State<AuthPage> {
         setState(() => _isRegistering = false);
       }
     } on AuthException catch (error) {
-      if (mounted) _showError(error.message);
+      if (mounted) {
+        _showError(error.message);
+      }
     } catch (_) {
-      if (mounted) _showError(texts.networkError);
+      if (mounted) {
+        _showError(texts.networkError);
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -179,8 +195,12 @@ class _AuthPageState extends State<AuthPage> {
 
   String? _validEmail(String? value, AppTexts texts) {
     final email = (value ?? '').trim();
-    if (email.isEmpty) return texts.requiredField;
-    if (!_emailPattern.hasMatch(email)) return texts.invalidEmail;
+    if (email.isEmpty) {
+      return texts.requiredField;
+    }
+    if (!_emailPattern.hasMatch(email)) {
+      return texts.invalidEmail;
+    }
     return null;
   }
 
@@ -235,7 +255,9 @@ class _AuthPageState extends State<AuthPage> {
                       ),
                       validator: (value) {
                         final required = _required(value, texts.requiredField);
-                        if (required != null) return required;
+                        if (required != null) {
+                          return required;
+                        }
                         if (_isRegistering && value!.length < 6) {
                           return texts.passwordTooShort;
                         }
@@ -291,7 +313,9 @@ class _AuthPageState extends State<AuthPage> {
           DropdownMenuItem(value: 'teacher', child: Text(texts.teacher)),
         ],
         onChanged: (value) {
-          if (value != null) setState(() => _role = value);
+          if (value != null) {
+            setState(() => _role = value);
+          }
         },
       ),
       const SizedBox(height: 14),
@@ -375,7 +399,9 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   List<Widget> _classFields(AppTexts texts) {
-    if (_subsystem == null || _sector == null) return const [];
+    if (_subsystem == null || _sector == null) {
+      return const [];
+    }
     if (_loadingLevels) {
       return const [
         Padding(
@@ -421,7 +447,9 @@ class _AuthPageState extends State<AuthPage> {
         validator: (value) => value == null ? texts.selectionRequired : null,
         onChanged: (value) {
           setState(() => _level = value);
-          if (value != null) _loadTracks(value);
+          if (value != null) {
+            _loadTracks(value);
+          }
         },
       ),
       if (level != null) ...[
@@ -459,7 +487,9 @@ class _AuthPageState extends State<AuthPage> {
       if (level.verification == VerificationStatus.pendingOfficialConfirmation)
         texts.verificationPending,
     ];
-    if (lines.isEmpty) return const SizedBox.shrink();
+    if (lines.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

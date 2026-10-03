@@ -74,13 +74,17 @@ class _PeriodsTabState extends State<_PeriodsTab> {
     });
     try {
       final p = await _service.listPeriods();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _periods = p;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = _fr ? 'Chargement impossible : $e' : 'Unable to load: $e';
@@ -91,13 +95,17 @@ class _PeriodsTabState extends State<_PeriodsTab> {
   Future<void> _toggle(GradePeriod p, bool value) async {
     try {
       await _service.setPeriodPublished(p.id, value);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _snack(value
           ? (_fr ? 'Bulletins publiés : les élèves sont notifiés.' : 'Report cards published: students notified.')
           : (_fr ? 'Bulletins masqués.' : 'Report cards hidden.'));
       await _load();
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      }
     }
   }
 
@@ -116,13 +124,19 @@ class _PeriodsTabState extends State<_PeriodsTab> {
     );
     final label = ctl.text.trim();
     ctl.dispose();
-    if (ok != true || label.isEmpty) return;
+    if (ok != true || label.isEmpty) {
+      return;
+    }
     try {
       final next = _periods.isEmpty ? 1 : _periods.map((p) => p.position).reduce((a, b) => a > b ? a : b) + 1;
       await _service.createPeriod(label, next);
-      if (mounted) await _load();
+      if (mounted) {
+        await _load();
+      }
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Création impossible : $e' : 'Create failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Création impossible : $e' : 'Create failed: $e');
+      }
     }
   }
 
@@ -189,13 +203,17 @@ class _CoefficientsTabState extends State<_CoefficientsTab> {
   Future<void> _init() async {
     try {
       final c = await _service.listAllClasses();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _classes = c;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = _fr ? 'Chargement impossible : $e' : 'Unable to load: $e';
@@ -208,12 +226,18 @@ class _CoefficientsTabState extends State<_CoefficientsTab> {
       _classId = id;
       _subjects = const [];
     });
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     try {
       final s = await _service.listClassSubjects(id);
-      if (mounted) setState(() => _subjects = s);
-    } catch (_) {
-      if (mounted) _snack(_fr ? 'Matières indisponibles.' : 'Subjects unavailable.');
+      if (mounted) {
+        setState(() => _subjects = s);
+      }
+    } catch (e) {
+      if (mounted) {
+        _snack(_fr ? 'Matières indisponibles.' : 'Subjects unavailable.');
+      }
     }
   }
 
@@ -236,23 +260,33 @@ class _CoefficientsTabState extends State<_CoefficientsTab> {
     );
     final value = double.tryParse(ctl.text.trim().replaceAll(',', '.'));
     ctl.dispose();
-    if (ok != true) return;
+    if (ok != true) {
+      return;
+    }
     if (value == null || value <= 0 || value > 99) {
       _snack(_fr ? 'Coefficient invalide.' : 'Invalid coefficient.');
       return;
     }
     try {
       await _service.updateCoefficient(s.classSubjectId, value);
-      if (_classId != null) await _pick(_classId);
+      if (_classId != null) {
+        await _pick(_classId);
+      }
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)));
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)));
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -304,13 +338,17 @@ class _BulletinsTabState extends State<_BulletinsTab> {
   Future<void> _init() async {
     try {
       final c = await _service.listAllClasses();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _classes = c;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = _fr ? 'Chargement impossible : $e' : 'Unable to load: $e';
@@ -323,11 +361,15 @@ class _BulletinsTabState extends State<_BulletinsTab> {
       _classId = id;
       _roster = const [];
     });
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     try {
       final r = await _service.roster(id);
-      if (mounted) setState(() => _roster = r);
-    } catch (_) {
+      if (mounted) {
+        setState(() => _roster = r);
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_fr ? 'Liste des élèves indisponible.' : 'Student list unavailable.')),
@@ -338,8 +380,12 @@ class _BulletinsTabState extends State<_BulletinsTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)));
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)));
+    }
     final className = _classes.where((c) => c.id == _classId).map((c) => c.displayName).firstOrNull;
     return ListView(
       padding: const EdgeInsets.all(16),

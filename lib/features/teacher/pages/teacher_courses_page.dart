@@ -79,7 +79,9 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherResourcePage(
       locale: widget.locale, profile: widget.profile, course: course,
     )));
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(_reload);
   }
 

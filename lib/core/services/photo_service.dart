@@ -38,10 +38,14 @@ class PhotoService {
       allowedExtensions: allowedExtensions,
       withData: true,
     );
-    if (result == null || result.files.isEmpty) return null;
+    if (result == null || result.files.isEmpty) {
+      return null;
+    }
     final file = result.files.single;
     final bytes = file.bytes;
-    if (bytes == null) return null;
+    if (bytes == null) {
+      return null;
+    }
     return PickedAttachment(
       bytes: bytes,
       name: file.name,
@@ -112,7 +116,9 @@ class PhotoService {
   }
 
   Future<String?> signedUrl(String? path) async {
-    if (path == null || path.isEmpty) return null;
+    if (path == null || path.isEmpty) {
+      return null;
+    }
     return _client.storage.from('profile-photos').createSignedUrl(path, 3600);
   }
 }

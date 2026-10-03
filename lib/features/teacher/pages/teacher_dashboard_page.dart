@@ -12,6 +12,7 @@ import '../../settings/pages/settings_page.dart';
 import 'create_assignment_page.dart';
 import 'teacher_courses_page.dart';
 import 'teacher_payment_code_page.dart';
+import 'teacher_smart_progress_page.dart';
 
 class TeacherDashboardPage extends StatelessWidget {
   final Locale locale;
@@ -159,6 +160,19 @@ class TeacherDashboardPage extends StatelessWidget {
                       ),
                     ),
                     _Tile(
+                      Icons.insights_rounded,
+                      locale.languageCode == 'fr' ? 'Progression de la salle' : 'Class progress',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TeacherSmartProgressPage(
+                            locale: locale,
+                            profile: profile,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _Tile(
                       Icons.notifications_rounded,
                       texts.notifications,
                       () => Navigator.push(
@@ -288,14 +302,18 @@ class _TeacherClassesPageState extends State<_TeacherClassesPage> {
     try {
       final classes = await _service.listTeacherClasses(widget.profile.id);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _classes = classes;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;
@@ -426,14 +444,18 @@ class _TeacherSubjectsPageState extends State<_TeacherSubjectsPage> {
     try {
       final subjects = await _service.listSubjects(widget.profile);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _subjects = subjects;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _loading = false;

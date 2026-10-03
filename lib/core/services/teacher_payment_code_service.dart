@@ -21,7 +21,9 @@ class TeacherPaymentCodeService {
 
   Future<int> getWalletBalance() async {
     final user = _client.auth.currentUser;
-    if (user == null) return 0;
+    if (user == null) {
+      return 0;
+    }
     final row = await _client
         .from('teacher_wallets')
         .select('balance_xaf')
@@ -32,7 +34,9 @@ class TeacherPaymentCodeService {
 
   Future<Map<String, dynamic>?> getOwnCode() async {
     final user = _client.auth.currentUser;
-    if (user == null) return null;
+    if (user == null) {
+      return null;
+    }
     final row = await _client
         .from('teacher_payment_codes')
         .select('code, active, created_at')

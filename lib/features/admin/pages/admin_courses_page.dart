@@ -44,13 +44,17 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
           .from('courses')
           .select('id,title_fr,title_en,description_fr,description_en,status,created_at,class_id,subject_id,teacher_id,school_classes(display_name,name),subjects(name_fr,name_en,code)')
           .order('created_at', ascending: false);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _items = List<Map<String, dynamic>>.from(rows);
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = e.toString();
@@ -65,7 +69,9 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
   }
 
   String _nestedName(dynamic raw, String keyFr, String keyEn) {
-    if (raw is! Map) return '';
+    if (raw is! Map) {
+      return '';
+    }
     final fr = raw[keyFr]?.toString() ?? '';
     final en = raw[keyEn]?.toString() ?? '';
     return _fr ? (fr.isNotEmpty ? fr : en) : (en.isNotEmpty ? en : fr);
@@ -75,7 +81,9 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     setState(() => _catalogLoading = true);
     try {
       final result = await _client.rpc('admin_apply_base_subject_catalog');
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_fr
             ? 'Catalogue de base appliqué aux salles. Vous pouvez ajuster chaque salle ensuite.'
@@ -83,12 +91,16 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
       );
       debugPrint('Catalog rows affected: $result');
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_fr ? 'Impossible d’appliquer le catalogue : $e' : 'Unable to apply catalogue: $e')),
       );
     } finally {
-      if (mounted) setState(() => _catalogLoading = false);
+      if (mounted) {
+        setState(() => _catalogLoading = false);
+      }
     }
   }
 
@@ -96,7 +108,9 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     final classes = List<Map<String, dynamic>>.from(
       await _client.from('school_classes').select('id,display_name,name,subsystem,sector,is_active').eq('is_active', true).order('display_name'),
     );
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     if (classes.isEmpty) {
       _snack(_fr ? 'Créez d’abord une salle active.' : 'Create an active classroom first.');
       return;
@@ -139,7 +153,9 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     }
 
     await loadSubjects((_) {});
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -217,11 +233,15 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                             contentEn: contentEn.text,
                             status: published ? 'published' : 'draft',
                           );
-                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                          if (sheetContext.mounted) {
+                            Navigator.pop(sheetContext);
+                          }
                           await _load();
                         } catch (e) {
                           setDialog(() => saving = false);
-                          if (sheetContext.mounted) ScaffoldMessenger.of(sheetContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                          if (sheetContext.mounted) {
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                          }
                         }
                       },
                       icon: const Icon(Icons.publish_rounded),
@@ -248,16 +268,22 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
         ListTile(leading: const Icon(Icons.photo_library), title: Text(_fr ? 'Choisir une photo' : 'Choose a photo'), onTap: () => Navigator.pop(ctx, 'gallery')),
       ])),
     );
-    if (source == null) return;
+    if (source == null) {
+      return;
+    }
     PlatformFile file;
     if (source == 'camera' || source == 'gallery') {
       final x = await _picker.pickImage(source: source == 'camera' ? ImageSource.camera : ImageSource.gallery, imageQuality: 90);
-      if (x == null) return;
+      if (x == null) {
+        return;
+      }
       final bytes = await x.readAsBytes();
       file = PlatformFile(name: x.name, size: bytes.length, bytes: bytes);
     } else {
       final result = await FilePicker.platform.pickFiles(withData: true, type: FileType.any);
-      if (result == null || result.files.isEmpty) return;
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
       file = result.files.first;
     }
     if (file.bytes == null || file.bytes!.isEmpty) { _snack(_fr ? 'Impossible de lire ce fichier.' : 'Unable to read this file.'); return; }

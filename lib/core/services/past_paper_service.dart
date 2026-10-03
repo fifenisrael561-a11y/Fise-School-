@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/past_paper.dart';
-import '../offline/json_cache.dart';
 
 class PastPaperService {
   PastPaperService({SupabaseClient? client})
@@ -11,20 +10,17 @@ class PastPaperService {
   final SupabaseClient _client;
   static const bucket = 'past-papers';
 
-  Future<List<PastPaper>> list({bool includeUnpublished = false}) {
-    return JsonCache.instance.cachedRead<List<PastPaper>>(
-      key: 'past_papers_${includeUnpublished ? 'all' : 'published'}',
-      fetch: () {
-        var query = _client.from('past_papers').select();
-        if (!includeUnpublished) {
-          query = query.eq('is_published', true);
-        }
-        return query.order('exam_year', ascending: false).order('subject_fr');
-      },
-      decode: (raw) => (raw as List)
-          .map((row) => PastPaper.fromMap(Map<String, dynamic>.from(row as Map)))
-          .toList(growable: false),
-    );
+  Future<List<PastPaper>> list({bool includeUnpublished = false}) async {
+    var query = _client.from('past_papers').select();
+    if (!includeUnpublished) {
+      query = query.eq('is_published', true);
+    }
+    final rows = await query
+        .order('exam_year', ascending: false)
+        .order('subject_fr');
+    return rows
+        .map((row) => PastPaper.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
   }
 
   Future<String> signedUrl(String path) =>
@@ -58,9 +54,12 @@ class PastPaperService {
     String? examId,
     String? subsystem,
     String? session,
+    List<String> classIds = const [],
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw const AuthException('Session utilisateur absente.');
+    if (user == null) {
+      throw const AuthException('Session utilisateur absente.');
+    }
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       throw StateError('Fichier illisible ou vide.');
@@ -75,8 +74,9 @@ class PastPaperService {
             upsert: false,
           ),
         );
+    String? paperId;
     try {
-      await _client.from('past_papers').insert({
+      final row = await _client.from('past_papers').insert({
         'exam_id': examId,
         'subsystem': subsystem,
         'exam_year': year,
@@ -89,9 +89,18 @@ class PastPaperService {
         'file_path': path,
         'file_name': file.name,
         'created_by': user.id,
-      });
+      }).select('id').single();
+      paperId = row['id'].toString();
+      // Liste vide = visible par toutes les salles.
+      await setTargets(paperId, classIds);
     } catch (_) {
-      // Nettoyage : ne pas laisser un fichier orphelin si l'insertion échoue.
+      // Nettoyage : ne pas laisser un fichier orphelin ni une annale ouverte à tous
+      // si l'enregistrement des salles échoue.
+      if (paperId != null) {
+        try {
+          await _client.from('past_papers').delete().eq('id', paperId);
+        } catch (_) {}
+      }
       try {
         await _client.storage.from(bucket).remove([path]);
       } catch (_) {}
@@ -111,5 +120,28 @@ class PastPaperService {
     try {
       await _client.storage.from(bucket).remove([paper.filePath]);
     } catch (_) {}
+  }
+
+  /// Salles ciblées par annale (paper_id -> class ids). Absent = toutes les salles.
+  Future<Map<String, List<String>>> listTargets() async {
+    final rows = await _client.from('past_paper_classes').select('paper_id, class_id');
+    final result = <String, List<String>>{};
+    for (final row in rows) {
+      result
+          .putIfAbsent(row['paper_id'].toString(), () => <String>[])
+          .add(row['class_id'].toString());
+    }
+    return result;
+  }
+
+  /// Remplace les salles de diffusion. Liste vide = toutes les salles.
+  Future<void> setTargets(String paperId, List<String> classIds) async {
+    await _client.from('past_paper_classes').delete().eq('paper_id', paperId);
+    if (classIds.isEmpty) {
+      return;
+    }
+    await _client.from('past_paper_classes').insert([
+      for (final classId in classIds) {'paper_id': paperId, 'class_id': classId},
+    ]);
   }
 }

@@ -18,6 +18,26 @@ class ForumClass {
   }
 }
 
+class TeacherClassChoice {
+  final String id;
+  final String displayName;
+  final bool isSelected;
+
+  const TeacherClassChoice({
+    required this.id,
+    required this.displayName,
+    required this.isSelected,
+  });
+
+  factory TeacherClassChoice.fromMap(Map<String, dynamic> map) {
+    return TeacherClassChoice(
+      id: map['id'] as String,
+      displayName: (map['display_name'] ?? map['name'] ?? '').toString(),
+      isSelected: map['is_selected'] as bool? ?? false,
+    );
+  }
+}
+
 class ForumTopic {
   final String id;
   final String classId;

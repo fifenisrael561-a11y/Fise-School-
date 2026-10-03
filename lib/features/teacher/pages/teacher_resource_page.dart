@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/pedagogy_service.dart';
+import '../../../core/services/smart_course_service.dart';
 import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
 
@@ -25,6 +26,7 @@ class TeacherResourcePage extends StatefulWidget {
 
 class _TeacherResourcePageState extends State<TeacherResourcePage> {
   final ResourceService _service = ResourceService();
+  final SmartCourseService _smart = SmartCourseService();
 
   late Future<List<CourseResource>> _resourcesFuture;
 
@@ -191,13 +193,25 @@ class _TeacherResourcePageState extends State<TeacherResourcePage> {
         return;
       }
 
-      await _service.uploadResource(
+      final resource = await _service.uploadResource(
         courseId: widget.course.id,
         lessonId: widget.lesson?.id,
         file: file,
         resourceType: type,
         position: position,
       );
+
+      if (type == 'pdf') {
+        try {
+          await _smart.reindexPdf(resource.id);
+        } catch (indexError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_isFrench ? 'PDF ajouté, mais l’indexation a échoué : $indexError' : 'PDF added, but indexing failed: $indexError')),
+            );
+          }
+        }
+      }
 
       if (!mounted) {
         return;
@@ -386,6 +400,67 @@ class _TeacherResourcePageState extends State<TeacherResourcePage> {
                   label: _isFrench ? 'Position' : 'Position',
                   value: (resource.position ?? 0).toString(),
                 ),
+                const SizedBox(height: 10),
+                _DetailRow(
+                  label: _isFrench ? 'Indexation' : 'Indexing',
+                  value: resource.resourceType == 'pdf'
+                      ? (resource.indexStatus == 'indexed'
+                          ? (resource.indexApproved ? (_isFrench ? 'Validée' : 'Approved') : (_isFrench ? 'À valider' : 'Awaiting approval'))
+                          : resource.indexStatus)
+                      : (_isFrench ? 'Non applicable' : 'Not applicable'),
+                ),
+                if (resource.indexError.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(resource.indexError, style: const TextStyle(color: Colors.redAccent)),
+                ],
+                if (resource.resourceType == 'pdf' && resource.indexPreview.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(_isFrench ? 'Aperçu IA' : 'AI preview', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+                    child: Text(resource.indexPreview, maxLines: 10, overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                if (resource.resourceType == 'pdf')
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            await _smart.reindexPdf(resource.id);
+                            if (sheetContext.mounted) {
+                              Navigator.of(sheetContext).pop();
+                              await _refresh();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(_isFrench ? 'Réindexer' : 'Re-index'),
+                      ),
+                      if (resource.indexStatus == 'indexed' && !resource.indexApproved)
+                        FilledButton.icon(
+                          onPressed: () async {
+                            await _smart.approveIndex(resource.id);
+                            if (sheetContext.mounted) {
+                              Navigator.of(sheetContext).pop();
+                              await _refresh();
+                            }
+                          },
+                          icon: const Icon(Icons.verified_rounded),
+                          label: Text(_isFrench ? 'Valider pour l’IA' : 'Approve for AI'),
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: 22),
                 SizedBox(
                   width: double.infinity,

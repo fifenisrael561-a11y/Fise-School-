@@ -49,7 +49,9 @@ class ClassSubjectEntry {
 
   factory ClassSubjectEntry.fromMap(Map<String, dynamic> map) {
     final raw = map['subjects'];
-    if (raw is! Map) throw const FormatException('Subject missing');
+    if (raw is! Map) {
+      throw const FormatException('Subject missing');
+    }
     return ClassSubjectEntry(
       subject: Subject.fromMap(Map<String, dynamic>.from(raw)),
       isCompulsory: map['is_compulsory'] as bool? ?? true,
@@ -131,20 +133,21 @@ class CourseChapter {
 }
 
 class Course {
-  final String id,
-      curriculumId,
+  final String id, subjectId, teacherId, titleFr, titleEn, status;
+  final String? curriculumId,
       chapterId,
-      subjectId,
-      teacherId,
-      titleFr,
-      titleEn,
-      status;
-  final String? classId, descriptionFr, descriptionEn, contentFr, contentEn;
+      classId,
+      descriptionFr,
+      descriptionEn,
+      contentFr,
+      contentEn;
+  final bool smartLessonEnabled;
+  final int minimumExerciseScore;
   final DateTime? publishedAt;
   const Course({
     required this.id,
-    required this.curriculumId,
-    required this.chapterId,
+    this.curriculumId,
+    this.chapterId,
     required this.subjectId,
     required this.teacherId,
     required this.titleFr,
@@ -155,12 +158,14 @@ class Course {
     this.descriptionEn,
     this.contentFr,
     this.contentEn,
+    this.smartLessonEnabled = true,
+    this.minimumExerciseScore = 50,
     this.publishedAt,
   });
   factory Course.fromMap(Map<String, dynamic> map) => Course(
     id: map['id'] as String,
-    curriculumId: map['curriculum_id'] as String,
-    chapterId: map['chapter_id'] as String,
+    curriculumId: map['curriculum_id'] as String?,
+    chapterId: map['chapter_id'] as String?,
     subjectId: map['subject_id'] as String,
     teacherId: map['teacher_id'] as String,
     classId: map['class_id'] as String?,
@@ -170,6 +175,8 @@ class Course {
     descriptionEn: map['description_en'] as String?,
     contentFr: map['content_fr'] as String?,
     contentEn: map['content_en'] as String?,
+    smartLessonEnabled: map['smart_lesson_enabled'] as bool? ?? true,
+    minimumExerciseScore: (map['minimum_exercise_score'] as num?)?.toInt() ?? 50,
     status: map['status'] as String? ?? 'draft',
     publishedAt: map['published_at'] is String
         ? DateTime.tryParse(map['published_at'] as String)
@@ -239,7 +246,10 @@ class CourseResource {
       titleFr,
       titleEn;
   final String? lessonId, mimeType;
-  final int? fileSize, position;
+  final int? fileSize, position, indexWordCount;
+  final String indexStatus, indexError, indexPreview;
+  final bool indexApproved;
+  final DateTime? indexedAt, updatedAt;
   const CourseResource({
     required this.id,
     required this.courseId,
@@ -252,6 +262,13 @@ class CourseResource {
     this.mimeType,
     this.fileSize,
     this.position,
+    this.indexStatus = 'pending',
+    this.indexError = '',
+    this.indexPreview = '',
+    this.indexWordCount = 0,
+    this.indexApproved = false,
+    this.indexedAt,
+    this.updatedAt,
   });
   factory CourseResource.fromMap(Map<String, dynamic> map) => CourseResource(
     id: map['id'] as String,
@@ -261,11 +278,21 @@ class CourseResource {
     storagePath: map['storage_path'] as String,
     fileName: map['file_name'] as String,
     mimeType: map['mime_type'] as String?,
-    fileSize: map['file_size'] as int?,
+    fileSize: (map['file_size'] as num?)?.toInt(),
     titleFr: map['title_fr'] as String,
     titleEn: map['title_en'] as String,
-    position: map['position'] as int?,
+    position: (map['position'] as num?)?.toInt(),
+    indexStatus: map['index_status'] as String? ?? 'pending',
+    indexError: map['index_error'] as String? ?? '',
+    indexPreview: map['index_preview'] as String? ?? '',
+    indexWordCount: (map['index_word_count'] as num?)?.toInt() ?? 0,
+    indexApproved: map['index_approved'] as bool? ?? false,
+    indexedAt: _parseOptionalDate(map['indexed_at']),
+    updatedAt: _parseOptionalDate(map['updated_at']),
   );
+  static DateTime? _parseOptionalDate(Object? value) =>
+      value is String ? DateTime.tryParse(value) : null;
+
   String labelFor(String languageCode) =>
       languageCode == 'en' ? titleEn : titleFr;
 }

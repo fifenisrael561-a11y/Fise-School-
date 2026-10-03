@@ -111,7 +111,9 @@ class _PromotionPageState extends State<PromotionPage> {
                   )
                   .toList(),
               onChanged: (value) {
-                if (value == null) return;
+                if (value == null) {
+                  return;
+                }
 
                 final match = data.destinationClasses.firstWhere(
                   (schoolClass) => schoolClass.id == value,
@@ -178,7 +180,9 @@ class _PromotionPageState extends State<PromotionPage> {
   ) async {
     final destination = _selectedClass;
 
-    if (destination == null) return;
+    if (destination == null) {
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -189,7 +193,9 @@ class _PromotionPageState extends State<PromotionPage> {
         destinationClass: destination,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _selectedClass = null;
@@ -216,7 +222,9 @@ class _PromotionPageState extends State<PromotionPage> {
     try {
       await _service.cancelPromotion(request.id);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() => _contextFuture = _service.loadContext(widget.profile));
     } catch (_) {

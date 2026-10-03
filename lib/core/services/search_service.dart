@@ -10,7 +10,9 @@ class SearchService {
 
   Future<List<SearchResult>> search(String query) async {
     final text = query.trim();
-    if (text.isEmpty) return const [];
+    if (text.isEmpty) {
+      return const [];
+    }
 
     final exams = await _client
         .from('exams')

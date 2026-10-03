@@ -35,14 +35,20 @@ class PushService {
   }
 
   static Future<void> registerForUser(String userId) async {
-    if (!_ready) return;
+    if (!_ready) {
+      return;
+    }
     try {
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.requestPermission();
-      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        return;
+      }
 
       final token = await messaging.getToken();
-      if (token == null) return;
+      if (token == null) {
+        return;
+      }
       _token = token;
       await _save(token);
 
@@ -61,7 +67,9 @@ class PushService {
 
   static Future<void> _save(String token) async {
     final client = Supabase.instance.client;
-    if (client.auth.currentUser == null) return;
+    if (client.auth.currentUser == null) {
+      return;
+    }
     await client.rpc(
       'register_device_token',
       params: {'p_token': token, 'p_platform': 'android'},
@@ -72,7 +80,9 @@ class PushService {
   /// notifications de l'ancien compte.
   static Future<void> unregister() async {
     final token = _token;
-    if (!_ready || token == null) return;
+    if (!_ready || token == null) {
+      return;
+    }
     try {
       await Supabase.instance.client
           .from('device_tokens')

@@ -282,7 +282,9 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
 
   Future<void> _assignSubject(Map<String, dynamic> subject) async {
     final subjectId = subject['id']?.toString();
-    if (subjectId == null) return;
+    if (subjectId == null) {
+      return;
+    }
     try {
       await _service.assignSubjectToClass(
         classId: classId,
@@ -291,25 +293,33 @@ class _SchoolClassDetailPageState extends State<SchoolClassDetailPage>
       );
       await _loadData();
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) {
+        _showError(error.toString());
+      }
     }
   }
 
   Future<void> _removeSubject(Map<String, dynamic> membership) async {
     final id = membership['id']?.toString();
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     final confirmed = await _confirm(
       title: isFrench ? 'Retirer la matière' : 'Remove subject',
       message: isFrench
           ? 'Retirer ${_subjectName(Map<String, dynamic>.from(membership['subjects'] as Map))} de cette salle ?'
           : 'Remove ${_subjectName(Map<String, dynamic>.from(membership['subjects'] as Map))} from this classroom?',
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
     try {
       await _service.removeSubjectFromClass(id);
       await _loadData();
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) {
+        _showError(error.toString());
+      }
     }
   }
 

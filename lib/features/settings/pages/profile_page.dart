@@ -157,7 +157,9 @@ class _ProfilePageState extends State<ProfilePage> {
       : null;
 
   Future<void> _save(AppTexts texts) async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     setState(() => _loading = true);
 
@@ -190,7 +192,9 @@ class _ProfilePageState extends State<ProfilePage> {
         ? await _photos.takePhoto()
         : await _photos.pickFromGallery();
 
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
 
     try {
       await _photos.uploadProfilePhoto(widget.profile.id, file);

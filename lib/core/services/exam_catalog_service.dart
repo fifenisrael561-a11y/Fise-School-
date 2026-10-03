@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/exam_catalog.dart';
-import '../offline/json_cache.dart';
 
 class ExamCatalogService {
   final SupabaseClient _client;
@@ -38,18 +37,15 @@ class ExamCatalogService {
     return values;
   }
 
-  Future<List<ExamDefinition>> getExams() {
-    return JsonCache.instance.cachedRead<List<ExamDefinition>>(
-      key: 'exam_definitions',
-      fetch: () =>
-          _client.from('exams').select().eq('active', true).order('name_fr'),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) =>
-                ExamDefinition.fromMap(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList(growable: false),
-    );
+  Future<List<ExamDefinition>> getExams() async {
+    final rows = await _client
+        .from('exams')
+        .select()
+        .eq('active', true)
+        .order('name_fr');
+    return rows
+        .map((row) => ExamDefinition.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
   }
 
   Future<List<ExamLevel>> getExamLevels({

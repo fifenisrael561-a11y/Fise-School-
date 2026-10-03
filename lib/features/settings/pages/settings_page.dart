@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/offline/local_cleanup.dart';
+import '../../../core/offline/course_offline_service.dart';
 import '../../../core/services/push_service.dart';
 import '../../../models/user_profile.dart';
 import '../../notifications/pages/notifications_page.dart';
+import 'offline_storage_page.dart';
+import '../../teacher/pages/teacher_payment_code_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final Locale locale;
@@ -70,6 +72,26 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 },
               ),
+              if (profile.role == 'teacher') ...[
+                _SettingsTile(
+                  icon: Icons.payments_outlined,
+                  title: isFrench ? 'Code de paiement' : 'Payment code',
+                  subtitle: isFrench
+                      ? 'Votre code unique pour les paiements des élèves'
+                      : 'Your unique code for student payments',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TeacherPaymentCodePage(
+                          locale: widget.locale,
+                          profile: profile,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
               _SettingsTile(
                 icon: Icons.logout_rounded,
                 title: isFrench ? 'Se déconnecter' : 'Sign out',
@@ -78,9 +100,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     : 'Sign out of Fise School on this device',
                 onTap: () async {
                   await PushService.unregister();
-                  await clearLocalUserData();
+                  await CourseOfflineService().deleteUserFiles(profile.id);
                   await Supabase.instance.client.auth.signOut();
-                  if (context.mounted) Navigator.popUntil(context, (route) => route.isFirst);
+                  if (context.mounted) {
+                    Navigator.popUntil(context, (route) => route.isFirst);
+                  }
                 },
               ),
             ],
@@ -134,6 +158,24 @@ class _SettingsPageState extends State<SettingsPage> {
           _SettingsSection(
             title: isFrench ? 'Application' : 'Application',
             children: [
+              _SettingsTile(
+                icon: Icons.offline_bolt_rounded,
+                title: isFrench ? 'Stockage hors ligne' : 'Offline storage',
+                subtitle: isFrench
+                    ? 'Gérer les cours téléchargés et l’espace utilisé'
+                    : 'Manage downloaded courses and storage space',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OfflineStoragePage(
+                        locale: widget.locale,
+                        profile: profile,
+                      ),
+                    ),
+                  );
+                },
+              ),
               _SettingsTile(
                 icon: Icons.info_outline_rounded,
                 title: isFrench
@@ -467,7 +509,9 @@ class _SecurityPageState extends State<_SecurityPage> {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(email);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       _showMessage(
         isFrench
@@ -475,11 +519,15 @@ class _SecurityPageState extends State<_SecurityPage> {
             : 'The reset link has been sent to your email address.',
       );
     } on AuthException catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       _showMessage(error.message);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       _showMessage(
         isFrench

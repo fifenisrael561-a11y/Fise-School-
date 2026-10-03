@@ -160,11 +160,21 @@ class Bulletin {
 
   /// Appréciation à partir de la moyenne sur 20.
   static String appreciation(double? avg, bool fr) {
-    if (avg == null) return '-';
-    if (avg >= 16) return fr ? 'Très bien' : 'Excellent';
-    if (avg >= 14) return fr ? 'Bien' : 'Very good';
-    if (avg >= 12) return fr ? 'Assez bien' : 'Good';
-    if (avg >= 10) return fr ? 'Passable' : 'Fair';
+    if (avg == null) {
+      return '-';
+    }
+    if (avg >= 16) {
+      return fr ? 'Très bien' : 'Excellent';
+    }
+    if (avg >= 14) {
+      return fr ? 'Bien' : 'Very good';
+    }
+    if (avg >= 12) {
+      return fr ? 'Assez bien' : 'Good';
+    }
+    if (avg >= 10) {
+      return fr ? 'Passable' : 'Fair';
+    }
     return fr ? 'Insuffisant' : 'Insufficient';
   }
 }

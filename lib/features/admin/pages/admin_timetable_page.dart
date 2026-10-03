@@ -36,7 +36,9 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
     final subjects = await _school.listClassSubjects(id);
     final teachers = await _school.listClassTeachers(id);
     final entries = await _timetable.listForClass(id);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() { _subjects = subjects.map((r) => Map<String,dynamic>.from(r['subjects'] as Map? ?? r)).toList(); _teachers = teachers.map((r) => Map<String,dynamic>.from(r['profiles'] as Map? ?? r)).toList(); _entries = entries; });
   }
 
@@ -45,11 +47,19 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
 
   Future<void> _pickTime(bool start) async {
     final picked = await showTimePicker(context: context, initialTime: start ? _start : _end);
-    if (picked != null && mounted) setState(() { if (start) { _start = picked; } else { _end = picked; } });
+    if (picked != null && mounted) {
+      setState(() { if (start) {
+        _start = picked;
+      } else {
+        _end = picked;
+      } });
+    }
   }
 
   Future<void> _save() async {
-    if (_classId == null || _subjectId == null) return;
+    if (_classId == null || _subjectId == null) {
+      return;
+    }
     final subject = _subjects.firstWhere((s) => s['id'].toString() == _subjectId);
     final teacher = _teacherId == null ? null : _teachers.firstWhere((t) => t['id'].toString() == _teacherId);
     if ((_end.hour * 60 + _end.minute) <= (_start.hour * 60 + _start.minute)) { _show(fr ? 'L’heure de fin doit être après le début.' : 'End time must be after start time.'); return; }
@@ -58,7 +68,9 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
       await _timetable.create(classId: _classId!, subjectId: _subjectId, subjectFr: subject['name_fr']?.toString() ?? '', subjectEn: subject['name_en']?.toString() ?? '', teacherId: _teacherId, teacherName: teacher == null ? null : '${teacher['first_name'] ?? ''} ${teacher['last_name'] ?? ''}'.trim(), dayOfWeek: _day, startTime: _time(_start), endTime: _time(_end), room: _room.text, notes: _notes.text);
       _room.clear(); _notes.clear();
       await _loadClass(_classId!);
-      if (mounted) _show(fr ? 'Créneau enregistré.' : 'Timetable slot saved.');
+      if (mounted) {
+        _show(fr ? 'Créneau enregistré.' : 'Timetable slot saved.');
+      }
     } catch (e) { if (mounted) _show(e.toString()); } finally { if (mounted) setState(() => _saving = false); }
   }
 
@@ -67,7 +79,9 @@ class _AdminTimetablePageState extends State<AdminTimetablePage> {
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(fr ? 'Emploi du temps' : 'Timetable')),
     body: FutureBuilder<List<Map<String,dynamic>>>(future: _classes, builder: (context, snap) {
-      if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+      if (!snap.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
       final classes = snap.data!;
       return ListView(padding: const EdgeInsets.all(16), children: [
         DropdownButtonFormField<String>(initialValue: _classId, decoration: InputDecoration(labelText: fr ? 'Salle' : 'Class'), items: classes.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text(c['display_name']?.toString() ?? ''))).toList(), onChanged: (v) { if (v != null) _loadClass(v); }),

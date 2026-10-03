@@ -1,10 +1,13 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/services/admin_school_service.dart';
 import '../../../core/services/exam_catalog_service.dart';
 import '../../../core/services/past_paper_service.dart';
 import '../../../models/exam_catalog.dart';
 import '../../../models/past_paper.dart';
+import '../../../models/school_class.dart';
+import '../widgets/class_target_picker.dart';
 
 class AdminPastPapersPage extends StatefulWidget {
   final Locale locale;
@@ -20,6 +23,8 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
   String? _error;
   List<PastPaper> _papers = const [];
   List<ExamDefinition> _exams = const [];
+  List<SchoolClass> _classes = const [];
+  Map<String, List<String>> _targets = const {};
 
   bool get _fr => widget.locale.languageCode == 'fr';
 
@@ -40,14 +45,26 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
       try {
         exams = await ExamCatalogService().getExams();
       } catch (_) {}
-      if (!mounted) return;
+      List<SchoolClass> classes = const [];
+      Map<String, List<String>> targets = const {};
+      try {
+        classes = (await AdminSchoolService().listClasses()).where((c) => c.isActive).toList(growable: false);
+        targets = await _service.listTargets();
+      } catch (_) {}
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _papers = papers;
         _exams = exams;
+        _classes = classes;
+        _targets = targets;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = _fr ? 'Chargement impossible : $e' : 'Unable to load: $e';
         _loading = false;
@@ -59,9 +76,13 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   String _examName(String? id) {
-    if (id == null) return '';
+    if (id == null) {
+      return '';
+    }
     for (final e in _exams) {
-      if (e.id == id) return e.labelFor(widget.locale.languageCode);
+      if (e.id == id) {
+        return e.labelFor(widget.locale.languageCode);
+      }
     }
     return '';
   }
@@ -75,6 +96,8 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
     String? subsystem;
     String kind = 'subject';
     PlatformFile? file;
+    bool allClasses = true;
+    Set<String> chosen = <String>{};
 
     final ok = await showDialog<bool>(
       context: context,
@@ -119,6 +142,20 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
                 onChanged: (v) => setLocal(() => kind = v ?? 'subject'),
               ),
               const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(_fr ? 'Diffuser dans' : 'Send to', style: const TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(height: 6),
+              ClassTargetPicker(
+                fr: _fr,
+                classes: _classes,
+                allClasses: allClasses,
+                selected: chosen,
+                onAllChanged: (v) => setLocal(() => allClasses = v),
+                onSelectionChanged: (v) => setLocal(() => chosen = v),
+              ),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () async {
                   final result = await FilePicker.platform.pickFiles(
@@ -144,6 +181,10 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
                   _snack(_fr ? 'Renseignez l’année, la matière et le fichier.' : 'Enter the year, subject and file.');
                   return;
                 }
+                if (!allClasses && chosen.isEmpty) {
+                  _snack(_fr ? 'Choisissez au moins une salle.' : 'Choose at least one classroom.');
+                  return;
+                }
                 Navigator.pop(ctx, true);
               },
               child: Text(_fr ? 'Publier' : 'Publish'),
@@ -158,11 +199,14 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
     final fr = subjectFr.text;
     final en = subjectEn.text;
     final sess = session.text;
+    final targetIds = allClasses ? <String>[] : chosen.toList(growable: false);
     subjectFr.dispose();
     subjectEn.dispose();
     session.dispose();
     yearCtl.dispose();
-    if (ok != true || picked == null || year == null) return;
+    if (ok != true || picked == null || year == null) {
+      return;
+    }
 
     try {
       await _service.create(
@@ -174,12 +218,17 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
         examId: examId,
         subsystem: subsystem,
         session: sess,
+        classIds: targetIds,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _snack(_fr ? 'Annale publiée.' : 'Past paper published.');
       await _load();
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Échec de l’envoi : $e' : 'Upload failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Échec de l’envoi : $e' : 'Upload failed: $e');
+      }
     }
   }
 
@@ -195,21 +244,94 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
         ],
       ),
     );
-    if (confirm != true) return;
+    if (confirm != true) {
+      return;
+    }
     try {
       await _service.delete(paper);
-      if (mounted) await _load();
+      if (mounted) {
+        await _load();
+      }
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Suppression impossible : $e' : 'Delete failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Suppression impossible : $e' : 'Delete failed: $e');
+      }
+    }
+  }
+
+  String _audienceLabel(PastPaper paper) {
+    final ids = _targets[paper.id];
+    if (ids == null || ids.isEmpty) {
+      return _fr ? 'toutes les salles' : 'all classrooms';
+    }
+    final names = _classes.where((c) => ids.contains(c.id)).map((c) => c.displayName).toList();
+    if (names.isEmpty) {
+      return _fr ? '${ids.length} salle(s)' : '${ids.length} classroom(s)';
+    }
+    return names.length <= 2 ? names.join(', ') : (_fr ? '${names.length} salles' : '${names.length} classrooms');
+  }
+
+  Future<void> _editAudience(PastPaper paper) async {
+    final current = _targets[paper.id] ?? const <String>[];
+    bool allClasses = current.isEmpty;
+    Set<String> chosen = current.toSet();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(_fr ? 'Salles de diffusion' : 'Distribution'),
+          content: SingleChildScrollView(
+            child: ClassTargetPicker(
+              fr: _fr,
+              classes: _classes,
+              allClasses: allClasses,
+              selected: chosen,
+              onAllChanged: (v) => setLocal(() => allClasses = v),
+              onSelectionChanged: (v) => setLocal(() => chosen = v),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_fr ? 'Annuler' : 'Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (!allClasses && chosen.isEmpty) {
+                  _snack(_fr ? 'Choisissez au moins une salle.' : 'Choose at least one classroom.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: Text(_fr ? 'Enregistrer' : 'Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) {
+      return;
+    }
+    try {
+      await _service.setTargets(paper.id, allClasses ? const <String>[] : chosen.toList(growable: false));
+      if (mounted) {
+        await _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      }
     }
   }
 
   Future<void> _toggle(PastPaper paper) async {
     try {
       await _service.setPublished(paper.id, !paper.isPublished);
-      if (mounted) await _load();
+      if (mounted) {
+        await _load();
+      }
     } catch (e) {
-      if (mounted) _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      if (mounted) {
+        _snack(_fr ? 'Modification impossible : $e' : 'Update failed: $e');
+      }
     }
   }
 
@@ -241,11 +363,20 @@ class _AdminPastPapersPageState extends State<AdminPastPapersPage> {
                             child: ListTile(
                               leading: Icon(p.isCorrection ? Icons.task_alt : Icons.description_outlined),
                               title: Text(p.subjectFor(widget.locale.languageCode), style: const TextStyle(fontWeight: FontWeight.w700)),
-                              subtitle: Text([if (exam.isNotEmpty) exam, '${p.year}', p.isPublished ? (_fr ? 'publiée' : 'published') : (_fr ? 'masquée' : 'hidden')].join(' · ')),
+                              subtitle: Text([if (exam.isNotEmpty) exam, '${p.year}', _audienceLabel(p), p.isPublished ? (_fr ? 'publiée' : 'published') : (_fr ? 'masquée' : 'hidden')].join(' · ')),
                               trailing: PopupMenuButton<String>(
-                                onSelected: (v) => v == 'toggle' ? _toggle(p) : _delete(p),
+                                onSelected: (v) {
+                                  if (v == 'toggle') {
+                                    _toggle(p);
+                                  } else if (v == 'audience') {
+                                    _editAudience(p);
+                                  } else {
+                                    _delete(p);
+                                  }
+                                },
                                 itemBuilder: (_) => [
                                   PopupMenuItem(value: 'toggle', child: Text(p.isPublished ? (_fr ? 'Masquer' : 'Hide') : (_fr ? 'Publier' : 'Publish'))),
+                                  PopupMenuItem(value: 'audience', child: Text(_fr ? 'Salles de diffusion' : 'Distribution')),
                                   PopupMenuItem(value: 'delete', child: Text(_fr ? 'Supprimer' : 'Delete')),
                                 ],
                               ),

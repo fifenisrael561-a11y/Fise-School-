@@ -1,6 +1,7 @@
 class TimetableEntry {
   final String id;
   final String? classId;
+  final String? subjectId;
   final int dayOfWeek;
   final String startTime;
   final String endTime;
@@ -14,6 +15,7 @@ class TimetableEntry {
   const TimetableEntry({
     required this.id,
     this.classId,
+    this.subjectId,
     required this.dayOfWeek,
     required this.startTime,
     required this.endTime,
@@ -33,6 +35,7 @@ class TimetableEntry {
     return TimetableEntry(
       id: map['id'] as String,
       classId: map['class_id'] as String?,
+      subjectId: map['subject_id'] as String?,
       dayOfWeek: (map['day_of_week'] as num).toInt(),
       startTime: time(map['start_time']),
       endTime: time(map['end_time']),

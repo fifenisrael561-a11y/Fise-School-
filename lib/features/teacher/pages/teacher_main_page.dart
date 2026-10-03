@@ -6,11 +6,10 @@ import '../../forum/pages/forum_page.dart';
 import '../../settings/pages/profile_page.dart';
 import '../../settings/pages/settings_page.dart';
 import 'teacher_courses_page.dart';
-import 'create_assignment_page.dart';
+import 'qcm_builder_page.dart';
 import 'teacher_timetable_page.dart';
 import 'grades_entry_page.dart';
-import '../../notifications/pages/notifications_page.dart';
-import '../../messages/pages/private_messages_page.dart';
+import '../../messages/pages/messages_hub_page.dart';
 
 class TeacherMainPage extends StatefulWidget {
   final Locale locale;
@@ -61,13 +60,12 @@ class _TeacherHome extends StatelessWidget {
         const SizedBox(height: 16),
         Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [const Icon(Icons.school_rounded, color: Color(0xFF166534)), const SizedBox(width: 10), Text(fr ? 'Mes salles' : 'My classrooms', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))]), const SizedBox(height: 8), Text(fr ? 'Choisissez toujours une salle avant de publier un contenu ou de créer un forum.' : 'Always choose a classroom before publishing content or creating a forum.'), const SizedBox(height: 12), FilledButton.icon(onPressed: onForums, icon: const Icon(Icons.forum_outlined), label: Text(fr ? 'Créer un forum' : 'Create a forum'))]))),
         const SizedBox(height: 12),
-        _TeacherAction(icon: Icons.menu_book_rounded, title: fr ? 'Cours et contenus' : 'Courses and content', subtitle: fr ? 'Cours, leçons, documents, vidéos et audio.' : 'Courses, lessons, documents, video and audio.', onTap: onCourses),
-        _TeacherAction(icon: Icons.quiz_rounded, title: fr ? 'QCM et exercices' : 'Quizzes and exercises', subtitle: fr ? 'Créer des activités pour vos élèves.' : 'Create activities for your students.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateAssignmentPage(locale: locale, profile: profile)))),
+        _TeacherAction(icon: Icons.menu_book_rounded, title: fr ? 'Cours et contenus' : 'Courses and content', subtitle: fr ? 'Publier un cours (PDF, photo, images) dans vos classes.' : 'Publish a course (PDF, photo, images) in your classes.', onTap: onCourses),
+        _TeacherAction(icon: Icons.quiz_rounded, title: fr ? 'QCM et exercices' : 'Quizzes and exercises', subtitle: fr ? 'Construire un QCM et le publier dans une ou plusieurs classes.' : 'Build a quiz and publish it in one or more classes.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => QcmBuilderPage(locale: locale, profile: profile)))),
         _TeacherAction(icon: Icons.grading_rounded, title: fr ? 'Notes' : 'Marks', subtitle: fr ? 'Saisir les notes de vos élèves par matière et par période.' : 'Enter your students\' marks by subject and period.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GradesEntryPage(locale: locale, profile: profile)))),
         _TeacherAction(icon: Icons.forum_rounded, title: fr ? 'Forums' : 'Forums', subtitle: fr ? 'Chaque forum est rattaché à une salle.' : 'Every forum belongs to a classroom.', onTap: onForums),
         _TeacherAction(icon: Icons.calendar_month_rounded, title: fr ? 'Emploi du temps' : 'Timetable', subtitle: fr ? 'Consultez vos créneaux de cours.' : 'View your teaching schedule.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherTimetablePage(locale: locale, profile: profile)))),
-        _TeacherAction(icon: Icons.notifications_outlined, title: fr ? 'Notifications' : 'Notifications', subtitle: fr ? 'Nouveaux devoirs, messages et annonces.' : 'Assignments, messages and announcements.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsPage(locale: locale, userId: profile.id)))),
-        _TeacherAction(icon: Icons.chat_bubble_outline, title: fr ? 'Messages' : 'Messages', subtitle: fr ? 'Échanger avec les élèves de vos salles.' : 'Chat with students in your classrooms.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivateMessagesPage(locale: locale, profile: profile)))),
+        _TeacherAction(icon: Icons.chat_bubble_outline, title: fr ? 'Messages' : 'Messages', subtitle: fr ? 'Échanger avec les élèves de vos salles.' : 'Chat with students in your classrooms.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesHubPage(locale: locale, profile: profile)))),
       ]),
     );
   }

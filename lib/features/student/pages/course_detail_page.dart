@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/offline/connectivity_service.dart';
+import '../../../core/offline/course_offline_service.dart';
 import '../../../core/services/pedagogy_service.dart';
 import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
+import '../widgets/offline_resource_tile.dart';
 import 'lesson_page.dart';
 
 class CourseDetailPage extends StatefulWidget {
@@ -23,6 +28,10 @@ class CourseDetailPage extends StatefulWidget {
 
 class _CourseDetailPageState extends State<CourseDetailPage> {
   final LessonService _lessonService = LessonService();
+  final CourseOfflineService _offline = CourseOfflineService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  StreamSubscription<bool>? _connectionSubscription;
+  bool _offlineMode = false;
 
   late Future<List<Lesson>> _lessonsFuture;
 
@@ -48,6 +57,22 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   void initState() {
     super.initState();
     _loadLessons();
+    _prepareOffline();
+    _connectionSubscription = _connectivity.connectionStream.listen((online) {
+      if (mounted) {
+        setState(() => _offlineMode = !online);
+      }
+    });
+  }
+
+  Future<void> _prepareOffline() async {
+    await _offline.enqueueCourse(userId: widget.profile.id, course: widget.course);
+  }
+
+  @override
+  void dispose() {
+    _connectionSubscription?.cancel();
+    super.dispose();
   }
 
   void _loadLessons() {
@@ -144,6 +169,36 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
                 _buildCourseHeader(isEnglish),
+                if (_offlineMode) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xFFFFF4D6), borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [
+                      const Icon(Icons.cloud_off_rounded, color: Color(0xFF8A5A00)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(isEnglish ? 'You are offline. Downloaded course files remain available.' : 'Vous êtes hors ligne. Les fichiers téléchargés restent disponibles.')),
+                    ]),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                FutureBuilder<List<CourseResource>>(
+                  future: _offline.resourcesForCourse(widget.profile.id, widget.course.id),
+                  builder: (context, resourceSnapshot) {
+                    final resources = resourceSnapshot.data ?? const <CourseResource>[];
+                    if (resources.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isEnglish ? 'Course files' : 'Fichiers du cours', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ...resources.map((resource) => OfflineResourceTile(locale: widget.locale, profile: widget.profile, resource: resource)),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [

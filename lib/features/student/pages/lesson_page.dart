@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import '../../../core/offline/course_offline_service.dart';
+import '../../../core/offline/offline_resource_viewer.dart';
 import '../../../core/services/pedagogy_service.dart';
 import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
@@ -26,6 +27,7 @@ class LessonPage extends StatefulWidget {
 class _LessonPageState extends State<LessonPage> {
   final ProgressService _progressService = ProgressService();
   final ResourceService _resourceService = ResourceService();
+  final CourseOfflineService _offline = CourseOfflineService();
 
   LessonProgress? _progress;
   List<CourseResource> _resources = const [];
@@ -111,11 +113,7 @@ class _LessonPageState extends State<LessonPage> {
     try {
       final results = await Future.wait([
         _progressService.get(widget.profile.id, widget.lesson.id),
-        // Les documents joints ne doivent jamais empêcher d'ouvrir la leçon
-        // (par exemple sans connexion).
-        _resourceService
-            .listForLesson(widget.lesson.id)
-            .catchError((Object _) => <CourseResource>[]),
+        _resourceService.listForLesson(widget.lesson.id),
       ]);
 
       final progress = results[0] as LessonProgress?;
@@ -205,6 +203,11 @@ class _LessonPageState extends State<LessonPage> {
     }
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _openResource(CourseResource resource) async {
     if (_loadingResource) {
       return;
@@ -215,15 +218,25 @@ class _LessonPageState extends State<LessonPage> {
     });
 
     try {
-      final url = await _resourceService.createSignedUrl(resource.storagePath);
-
-      final opened = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!opened) {
-        throw Exception();
+      final local = await _offline.getLocal(widget.profile.id, resource.id);
+      if (local != null && local.status == 'done') {
+        await _offline.markOpened(widget.profile.id, resource.id);
+        if (!mounted) {
+          return;
+        }
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => OfflineResourceViewer(
+          locale: widget.locale, userId: widget.profile.id, resource: resource, localPath: local.localPath,
+        )));
+      } else {
+        if (resource.storagePath.isEmpty) {
+          throw Exception();
+        }
+        final url = await _resourceService.createSignedUrl(resource.storagePath);
+        // Keep the existing online fallback only when no local copy exists.
+        final uri = Uri.parse(url);
+        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          throw Exception();
+        }
       }
     } catch (_) {
       if (!mounted) {

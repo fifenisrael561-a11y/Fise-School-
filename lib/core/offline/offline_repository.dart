@@ -3,15 +3,12 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../models/pedagogy.dart';
+import '../../models/assignment.dart';
 import 'app_database.dart';
 
 class OfflineRepository {
   OfflineRepository({AppDatabase? database})
-      : _database = database ?? _sharedDatabase;
-
-  /// Une seule connexion SQLite pour toute l'application : ouvrir plusieurs
-  /// instances Drift sur le même fichier provoque des conflits d'accès.
-  static final AppDatabase _sharedDatabase = AppDatabase();
+      : _database = database ?? AppDatabase();
 
   final AppDatabase _database;
 
@@ -37,13 +34,6 @@ class OfflineRepository {
     for (final course in courses) {
       await saveCourse(course);
     }
-  }
-
-  /// Remplace tout le cache des cours par la liste serveur : un cours retiré
-  /// ou dépublié par l'enseignant disparaît aussi hors ligne.
-  Future<void> replaceCourses(List<Course> courses) async {
-    await _database.deleteAllCourses();
-    await saveCourses(courses);
   }
 
   Future<List<Course>> getCourses() async {
@@ -181,6 +171,68 @@ class OfflineRepository {
   }
 
   // ============================================================
+  // QCM / DEVOIRS HORS LIGNE
+  // ============================================================
+
+  Future<void> saveAssignment(Assignment assignment, String userId) => _database.saveOfflineQcm(
+    id: assignment.id, userId: userId, kind: 'assignment', dataJson: jsonEncode(assignment.toMap()),
+  );
+
+  Future<void> saveAssignmentQuestions(List<AssignmentQuestion> questions, String userId) async {
+    for (final question in questions) {
+      await _database.saveOfflineQcm(
+        id: question.id, userId: userId, kind: 'question', assignmentId: question.assignmentId,
+        dataJson: jsonEncode(question.toMap()),
+      );
+    }
+  }
+
+  Future<List<Assignment>> getAssignments(String userId, {String? assignmentId}) async {
+    final rows = await _database.getOfflineQcm(userId, 'assignment', assignmentId: assignmentId);
+    return rows.map((row) => Assignment.fromMap(jsonDecode(row.read<String>('data_json')) as Map<String, dynamic>)).toList(growable: false);
+  }
+
+  Future<List<AssignmentQuestion>> getAssignmentQuestions(String userId, String assignmentId) async {
+    final rows = await _database.getOfflineQcm(userId, 'question', assignmentId: assignmentId);
+    return rows.map((row) => AssignmentQuestion.fromMap(jsonDecode(row.read<String>('data_json')) as Map<String, dynamic>)).toList(growable: false);
+  }
+
+  Future<void> savePendingAssignment({required String userId, required String submissionId, required String assignmentId, required Map<String, dynamic> payload}) => _database.saveOfflineQcmQueue(
+    id: '$submissionId:${DateTime.now().microsecondsSinceEpoch}', userId: userId, submissionId: submissionId, assignmentId: assignmentId, dataJson: jsonEncode(payload),
+  );
+
+  Future<List<Map<String, dynamic>>> getPendingAssignments(String userId) async {
+    final rows = await _database.getOfflineQcmQueue(userId);
+    return rows.map((row) => {
+      'id': row.read<String>('id'), 'submission_id': row.read<String>('submission_id'),
+      'assignment_id': row.read<String>('assignment_id'), 'data': jsonDecode(row.read<String>('data_json')),
+    }).toList(growable: false);
+  }
+
+  Future<void> removePendingAssignment(String id, String userId) => _database.deleteOfflineQcmQueue(id, userId);
+
+  Future<void> saveSubmission(AssignmentSubmission submission, String userId) => _database.saveOfflineQcm(
+    id: submission.id, userId: userId, kind: 'submission', assignmentId: submission.assignmentId, dataJson: jsonEncode(submission.toMap()),
+  );
+
+  Future<AssignmentSubmission?> getSubmission(String userId, String assignmentId) async {
+    final rows = await _database.getOfflineQcm(userId, 'submission', assignmentId: assignmentId);
+    if (rows.isEmpty) {
+      return null;
+    }
+    return AssignmentSubmission.fromMap(jsonDecode(rows.last.read<String>('data_json')) as Map<String, dynamic>);
+  }
+
+  Future<void> saveAnswer(AssignmentAnswer answer, String userId) => _database.saveOfflineQcm(
+    id: '${answer.submissionId}:${answer.questionId}', userId: userId, kind: 'answer', assignmentId: answer.submissionId, dataJson: jsonEncode(answer.toMap()),
+  );
+
+  Future<List<AssignmentAnswer>> getAnswers(String userId, String submissionId) async {
+    final rows = await _database.getOfflineQcm(userId, 'answer', assignmentId: submissionId);
+    return rows.map((row) => AssignmentAnswer.fromMap(jsonDecode(row.read<String>('data_json')) as Map<String, dynamic>)).toList(growable: false);
+  }
+
+  // ============================================================
   // NETTOYAGE DU CACHE
   // ============================================================
 
@@ -223,6 +275,8 @@ class OfflineRepository {
       'content_fr': course.contentFr,
       'content_en': course.contentEn,
       'status': course.status,
+      'smart_lesson_enabled': course.smartLessonEnabled,
+      'minimum_exercise_score': course.minimumExerciseScore,
       'published_at':
           course.publishedAt?.toIso8601String(),
     };

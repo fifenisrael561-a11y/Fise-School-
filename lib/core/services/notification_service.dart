@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/notification.dart';
-import '../offline/json_cache.dart';
 
 class NotificationService {
   final SupabaseClient _client;
@@ -9,22 +8,15 @@ class NotificationService {
   NotificationService({SupabaseClient? client})
     : _client = client ?? Supabase.instance.client;
 
-  Future<List<AppNotification>> listForUser(String userId) {
-    return JsonCache.instance.cachedRead<List<AppNotification>>(
-      key: 'notifications_$userId',
-      fetch: () => _client
-          .from('notifications')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false)
-          .limit(200),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) =>
-                AppNotification.fromMap(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList(growable: false),
-    );
+  Future<List<AppNotification>> listForUser(String userId) async {
+    final rows = await _client
+        .from('notifications')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+    return rows
+        .map((row) => AppNotification.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
   }
 
   Future<int> unreadCount(String userId) async {

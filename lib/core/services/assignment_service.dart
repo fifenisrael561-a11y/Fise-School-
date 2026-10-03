@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/assignment.dart';
-import '../offline/json_cache.dart';
+import '../offline/offline_repository.dart';
 
 class AssignmentService {
   final SupabaseClient _client;
@@ -13,82 +13,74 @@ class AssignmentService {
     required String studentId,
     String? courseId,
     String? lessonId,
-  }) {
-    return JsonCache.instance.cachedRead<List<Assignment>>(
-      key: 'assignments_${studentId}_${courseId ?? 'all'}_${lessonId ?? 'all'}',
-      fetch: () => _fetchStudentAssignmentRows(
-        studentId: studentId,
-        courseId: courseId,
-        lessonId: lessonId,
-      ),
-      decode: (raw) => (raw as List)
-          .map((row) => Assignment.fromMap(Map<String, dynamic>.from(row as Map)))
-          .toList(growable: false),
-    );
-  }
-
-  Future<List<dynamic>> _fetchStudentAssignmentRows({
-    required String studentId,
-    String? courseId,
-    String? lessonId,
+    String? subjectId,
   }) async {
-    final memberships = await _client
-        .from('class_students')
-        .select('class_id')
-        .eq('student_id', studentId)
-        .eq('is_active', true);
-
-    final classIds = memberships
-        .map((row) => row['class_id'])
-        .whereType<String>()
-        .toList(growable: false);
-
-    if (classIds.isEmpty) {
-      return const <dynamic>[];
+    try {
+      final memberships = await _client.from('class_students').select('class_id').eq('student_id', studentId).eq('is_active', true);
+      final classIds = memberships.map((row) => row['class_id']).whereType<String>().toList(growable: false);
+      if (classIds.isEmpty) {
+        return const [];
+      }
+      var request = _client.from('assignments').select().inFilter('class_id', classIds).inFilter('status', ['published', 'closed']);
+      if (courseId != null) {
+        request = request.eq('course_id', courseId);
+      }
+      if (lessonId != null) {
+        request = request.eq('lesson_id', lessonId);
+      }
+      if (subjectId != null) {
+        request = request.eq('subject_id', subjectId);
+      }
+      final rows = await request.order('due_at', ascending: true);
+      final assignments = rows.map((row) => Assignment.fromMap(Map<String, dynamic>.from(row))).toList(growable: false);
+      final offline = OfflineRepository();
+      for (final assignment in assignments) {
+        await offline.saveAssignment(assignment, studentId);
+        try { await offline.saveAssignmentQuestions(await listQuestions(assignment.id, studentId: studentId), studentId); } catch (_) {}
+      }
+      return assignments;
+    } catch (_) {
+      final cached = await OfflineRepository().getAssignments(studentId);
+      return cached.where((assignment) =>
+        (courseId == null || assignment.courseId == courseId) &&
+        (lessonId == null || assignment.lessonId == lessonId) &&
+        (subjectId == null || assignment.subjectId == subjectId),
+      ).toList(growable: false);
     }
-
-    var request = _client
-        .from('assignments')
-        .select()
-        .inFilter('class_id', classIds)
-        .inFilter('status', ['published', 'closed']);
-
-    if (courseId != null) {
-      request = request.eq('course_id', courseId);
-    }
-
-    if (lessonId != null) {
-      request = request.eq('lesson_id', lessonId);
-    }
-
-    return await request.order('due_at', ascending: true);
   }
 
-  Future<Assignment> getAssignment(String id) {
-    return JsonCache.instance.cachedRead<Assignment>(
-      key: 'assignment_$id',
-      fetch: () => _client.from('assignments').select().eq('id', id).single(),
-      decode: (raw) =>
-          Assignment.fromMap(Map<String, dynamic>.from(raw as Map)),
-    );
+  Future<Assignment> getAssignment(String id, {String? studentId}) async {
+    try {
+      final row = await _client.from('assignments').select().eq('id', id).single();
+      final assignment = Assignment.fromMap(Map<String, dynamic>.from(row));
+      if (studentId != null) {
+        await OfflineRepository().saveAssignment(assignment, studentId);
+      }
+      return assignment;
+    } catch (_) {
+      final cached = await OfflineRepository().getAssignments(studentId ?? (_client.auth.currentUser?.id ?? ''), assignmentId: id);
+      if (cached.isEmpty) {
+        rethrow;
+      }
+      return cached.first;
+    }
   }
 
-  Future<List<AssignmentQuestion>> listQuestions(String assignmentId) {
-    return JsonCache.instance.cachedRead<List<AssignmentQuestion>>(
-      key: 'assignment_questions_$assignmentId',
-      fetch: () => _client
-          .from('assignment_questions')
-          .select()
-          .eq('assignment_id', assignmentId)
-          .order('position', ascending: true),
-      decode: (raw) => (raw as List)
-          .map(
-            (row) => AssignmentQuestion.fromMap(
-              Map<String, dynamic>.from(row as Map),
-            ),
-          )
-          .toList(growable: false),
-    );
+  Future<List<AssignmentQuestion>> listQuestions(String assignmentId, {String? studentId}) async {
+    try {
+      final rows = await _client.from('assignment_questions').select().eq('assignment_id', assignmentId).order('position', ascending: true);
+      final questions = rows.map((row) => AssignmentQuestion.fromMap(Map<String, dynamic>.from(row))).toList(growable: false);
+      if (studentId != null) {
+        await OfflineRepository().saveAssignmentQuestions(questions, studentId);
+      }
+      return questions;
+    } catch (_) {
+      final userId = studentId ?? _client.auth.currentUser?.id;
+      if (userId == null) {
+        rethrow;
+      }
+      return OfflineRepository().getAssignmentQuestions(userId, assignmentId);
+    }
   }
 
   Future<AssignmentSubmission?> getStudentSubmission({
@@ -232,7 +224,8 @@ class AssignmentService {
 
   Future<Assignment> saveAssignment({
     String? id,
-    required String courseId,
+    String? courseId,
+    String? subjectId,
     String? lessonId,
     required String teacherId,
     required String classId,
@@ -246,6 +239,7 @@ class AssignmentService {
   }) async {
     final values = {
       'course_id': courseId,
+      'subject_id': subjectId,
       'lesson_id': lessonId,
       'teacher_id': teacherId,
       'class_id': classId,

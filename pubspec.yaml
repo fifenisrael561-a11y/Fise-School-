@@ -25,6 +25,10 @@ dependencies:
   sqlite3_flutter_libs: ^0.6.0+eol
   path_provider: ^2.1.5
   path: ^1.9.1
+  shared_preferences: ^2.5.3
+  pdfx: ^2.9.2
+  audioplayers: ^6.5.0
+  video_player: ^2.10.0
   # Notifications en arrière-plan (Firebase Cloud Messaging)
   firebase_core: ^4.2.0
   firebase_messaging: ^16.0.4

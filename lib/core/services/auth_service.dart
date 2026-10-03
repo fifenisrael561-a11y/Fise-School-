@@ -1,7 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'profile_service.dart';
-import '../offline/local_cleanup.dart';
+import '../offline/offline_repository.dart';
 
 class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
@@ -86,10 +87,14 @@ class AuthService {
   }
 
   Future<void> _ensureProfile(User? user) async {
-    if (user == null) return;
+    if (user == null) {
+      return;
+    }
 
     final existing = await _profileService.getCurrentProfile();
-    if (existing != null) return;
+    if (existing != null) {
+      return;
+    }
 
     final metadata = user.userMetadata ?? const <String, dynamic>{};
 
@@ -112,7 +117,12 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    await clearLocalUserData();
+    try {
+      await OfflineRepository().clearCourses();
+      await OfflineRepository().clearLessons();
+    } catch (e) {
+      debugPrint('Nettoyage du cache hors ligne impossible: $e');
+    }
     await _client.auth.signOut();
   }
 }

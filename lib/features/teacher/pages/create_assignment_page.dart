@@ -166,9 +166,13 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
       _courses = const [];
       _lessons = const [];
     });
-    if (value == null) return;
+    if (value == null) {
+      return;
+    }
     final courses = await _courseService.listTeacherCourses(widget.profile.id);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _courses = courses.where((c) => c.classId == value.id && c.status != 'archived').toList(growable: false);
     });
@@ -180,9 +184,13 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
       _selectedLesson = null;
       _lessons = const [];
     });
-    if (value == null) return;
+    if (value == null) {
+      return;
+    }
     final lessons = await _lessonService.listAllLessons(value.id);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() { _lessons = lessons; });
   }
 

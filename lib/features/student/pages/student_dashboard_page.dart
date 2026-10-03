@@ -11,6 +11,7 @@ import '../../settings/pages/profile_page.dart';
 import '../../settings/pages/settings_page.dart';
 import 'assignments_page.dart';
 import 'courses_page.dart';
+import 'daily_lesson_page.dart';
 import 'pages/payment_page.dart';
 import 'pages/premium_page.dart';
 import 'progress_page.dart';
@@ -42,6 +43,48 @@ class StudentDashboardPage extends StatelessWidget {
       children: [
         _Welcome(profile: profile, texts: texts),
 
+        Card(
+          margin: const EdgeInsets.only(bottom: 18),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DailyLessonPage(locale: locale, profile: profile),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.auto_stories_rounded, color: Color(0xFF166534), size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isFrench ? 'Leçon du jour' : 'Lesson of the day', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        Text(isFrench ? 'Ta prochaine leçon et son exercice selon ton planning.' : 'Your next lesson and exercise based on your timetable.'),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
+          ),
+        ),
 
         // ============================================================
         // PREMIUM
@@ -466,9 +509,6 @@ class _Welcome extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-
 
 // ============================================================================
 // GRILLE DU DASHBOARD
