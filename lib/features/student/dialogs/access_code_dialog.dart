@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/localization/app_texts.dart';
 import '../../../core/services/teacher_access_code_service.dart';
 import '../../../models/user_profile.dart';
 import '../../forum/pages/forum_page.dart';

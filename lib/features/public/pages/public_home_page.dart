@@ -26,7 +26,7 @@ class PublicHomePage extends StatelessWidget {
               child: Column(
                 children: [
                   _topBar(context, texts),
-                  _hero(texts, isWide),
+                  _hero(context, texts, isWide),
                   _profiles(context, texts, isWide),
                   _features(texts, isWide),
                   _footer(texts),
@@ -162,7 +162,7 @@ class PublicHomePage extends StatelessWidget {
     );
   }
 
-  Widget _hero(AppTexts texts, bool isWide) {
+  Widget _hero(BuildContext context, AppTexts texts, bool isWide) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
