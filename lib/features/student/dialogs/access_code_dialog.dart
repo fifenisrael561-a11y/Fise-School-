@@ -29,12 +29,9 @@ class _AccessCodeDialogState extends State<AccessCodeDialog> {
   String? _error;
 
   bool get _isFrench => widget.locale.languageCode == 'fr';
-  late AppTexts _texts;
-
   @override
   void initState() {
     super.initState();
-    _texts = AppTexts(widget.locale);
   }
 
   @override

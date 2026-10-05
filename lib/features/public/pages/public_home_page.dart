@@ -185,7 +185,7 @@ class PublicHomePage extends StatelessWidget {
       child: isWide
           ? Row(
               children: [
-                Expanded(child: _heroText(texts)),
+                Expanded(child: _heroText(context, texts)),
                 const SizedBox(width: 40),
                 _heroLogo(),
               ],
@@ -194,13 +194,13 @@ class PublicHomePage extends StatelessWidget {
               children: [
                 _heroLogo(),
                 const SizedBox(height: 28),
-                _heroText(texts),
+                _heroText(context, texts),
               ],
             ),
     );
   }
 
-  Widget _heroText(AppTexts texts) {
+  Widget _heroText(BuildContext context, AppTexts texts) {
     final isFrench = locale.languageCode == 'fr';
 
     return Semantics(

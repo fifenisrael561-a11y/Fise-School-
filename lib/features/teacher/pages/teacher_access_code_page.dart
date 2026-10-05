@@ -28,12 +28,9 @@ class _TeacherAccessCodePageState extends State<TeacherAccessCodePage> {
   bool _isEditing = false;
 
   bool get _isFrench => widget.locale.languageCode == 'fr';
-  late AppTexts _texts;
-
   @override
   void initState() {
     super.initState();
-    _texts = AppTexts(widget.locale);
     _loadCodes();
   }
 

@@ -101,13 +101,13 @@ class _StudentHome extends StatelessWidget {
             icon: Icons.history_edu_rounded,
             title: fr ? 'Annales d\'examens' : 'Past exam papers',
             subtitle: fr ? 'Sujets et corrigés des années précédentes.' : 'Papers and corrected exams from previous years.',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PastPapersPage(locale: locale, profile: profile))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PastPapersPage(locale: locale))),
           ),
           _QuickCard(
             icon: Icons.grading_rounded,
             title: fr ? 'Notes et bulletin' : 'Marks and report card',
             subtitle: fr ? 'Consulte tes notes, ton rang et exporte ton bulletin en PDF.' : 'See your marks, rank and export your report card.',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulletinPage(locale: locale, profile: profile))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulletinPage(locale: locale, studentId: profile.id, studentName: profile.firstName))),
           ),
           const SizedBox(height: 8),
           Row(children: [
