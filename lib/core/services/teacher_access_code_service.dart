@@ -43,7 +43,7 @@ class TeacherAccessCodeService {
     }
 
     // Générer un code si non fourni
-    final code = (suggestedCode ?? _generateCode()).replaceAll('fise', '').trim();
+    final code = _normalizeCode(suggestedCode ?? _generateCode());
 
     if (code.isEmpty) {
       throw ArgumentError('Code cannot be empty');
@@ -74,7 +74,7 @@ class TeacherAccessCodeService {
   ) async {
     _validateCode(newCode);
 
-    final cleanCode = newCode.replaceAll('fise', '').trim();
+    final cleanCode = _normalizeCode(newCode);
 
     final response = await _client
         .from('teacher_access_codes')
@@ -95,17 +95,17 @@ class TeacherAccessCodeService {
     String studentClassId,
   ) async {
     try {
-      final cleanCode = code.replaceAll('fise', '').trim();
+      final cleanCode = _normalizeCode(code);
 
-      final response = await _client
-          .from('teacher_access_codes')
-          .select()
-          .eq('code', cleanCode)
-          .eq('class_id', studentClassId)
-          .eq('is_active', true)
-          .maybeSingle();
+      final response = await _client.rpc(
+        'validate_teacher_access_code',
+        params: {
+          'p_code': cleanCode,
+          'p_class_id': studentClassId,
+        },
+      );
 
-      return response != null;
+      return response == true;
     } catch (_) {
       return false;
     }
@@ -138,10 +138,16 @@ class TeacherAccessCodeService {
 
   /// Génère un code aléatoire
   String _generateCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = DateTime.now().microsecond;
-    final part1 = random.toString().padLeft(6, '0').substring(0, 6);
-    return 'fise$part1';
+    final value = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    return 'fise${value.substring(value.length > 8 ? value.length - 8 : 0).toUpperCase()}';
+  }
+
+  String _normalizeCode(String value) {
+    var clean = value.trim();
+    if (clean.toLowerCase().startsWith('fise')) {
+      clean = clean.substring(4);
+    }
+    return clean.trim();
   }
 
   /// Valide le format du code
