@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/offline/course_offline_service.dart';
-import '../../../core/services/push_service.dart';
+import '../../../core/services/session_service.dart';
 import '../../../models/user_profile.dart';
 import '../../notifications/pages/notifications_page.dart';
 import 'offline_storage_page.dart';
