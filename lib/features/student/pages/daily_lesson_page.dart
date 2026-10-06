@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/gemini_service.dart';
 import '../../../core/services/smart_course_service.dart';
 import '../../../models/smart_learning.dart';
 import '../../../models/user_profile.dart';
@@ -22,6 +23,7 @@ class DailyLessonPage extends StatefulWidget {
 
 class _DailyLessonPageState extends State<DailyLessonPage> {
   final SmartCourseService _service = SmartCourseService();
+  final GeminiService _geminiService = GeminiService();
   late Future<SmartLesson?> _future;
   SmartLesson? _lesson;
   SmartExerciseResult? _result;
@@ -78,6 +80,89 @@ class _DailyLessonPageState extends State<DailyLessonPage> {
             ? 'La correction est temporairement indisponible. Réessayez avec une connexion stable.'
             : 'The correction service is temporarily unavailable. Try again with a stable connection.';
       });
+    }
+  }
+
+
+  Future<void> _askAboutExercise(SmartQuestion question) async {
+    final controller = TextEditingController();
+    final prompt = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_fr ? 'Poser une question sur l’application' : 'Ask about the application exercise'),
+        content: TextField(
+          controller: controller,
+          minLines: 3,
+          maxLines: 6,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: _fr
+                ? 'Ex. Je ne comprends pas comment commencer.'
+                : 'E.g. I do not understand how to start.',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(_fr ? 'Annuler' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.pop(dialogContext, value);
+            },
+            child: Text(_fr ? 'Demander à l’IA' : 'Ask AI'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (prompt == null || prompt.isEmpty || !mounted) return;
+
+    final exerciseContext = _fr
+        ? 'Leçon: ' + (_lesson?.text ?? '') + '\nExercice d’application: ' + question.question + '\nChoix: ' + question.choices.join(' | ')
+        : 'Lesson: ' + (_lesson?.text ?? '') + '\nApplication exercise: ' + question.question + '\nChoices: ' + question.choices.join(' | ');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final answer = await _geminiService.ask(
+        message: prompt,
+        profile: widget.profile,
+        history: [
+          AiHistoryMessage(role: 'user', text: exerciseContext),
+        ],
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(_fr ? 'Réponse de l’IA' : 'AI answer'),
+          content: SingleChildScrollView(child: SelectableText(answer)),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_fr
+              ? 'Impossible d’obtenir une réponse. Vérifiez votre connexion.'
+              : 'Unable to get an answer. Check your connection.'),
+        ),
+      );
     }
   }
 
@@ -193,6 +278,13 @@ class _DailyLessonPageState extends State<DailyLessonPage> {
                     }
                   }),
                   french: _fr,
+                ),
+                OutlinedButton.icon(
+                  onPressed: _submitting ? null : () => _askAboutExercise(lesson.questions.first),
+                  icon: const Icon(Icons.help_outline_rounded),
+                  label: Text(_fr
+                      ? 'Poser une question sur cet exercice'
+                      : 'Ask a question about this exercise'),
                 ),
               ],
               if (lesson.questions.length > 1) ...[
