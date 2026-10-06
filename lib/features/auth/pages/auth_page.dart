@@ -462,7 +462,11 @@ class _AuthPageState extends State<AuthPage> {
           key: ValueKey('track-${level?.id}'),
           initialValue: _track,
           isExpanded: true,
-          decoration: InputDecoration(labelText: texts.trackOptional),
+          decoration: InputDecoration(
+            labelText: _isForm5Anglophone
+                ? (_lang == 'fr' ? 'Parcours' : 'Track')
+                : texts.trackOptional,
+          ),
           items: [
             for (final item in _tracks)
               DropdownMenuItem(
@@ -473,11 +477,19 @@ class _AuthPageState extends State<AuthPage> {
                 ),
               ),
           ],
+          validator: _isForm5Anglophone
+              ? (value) => value == null ? texts.selectionRequired : null
+              : null,
           onChanged: (value) => setState(() => _track = value),
         ),
       ],
     ];
   }
+
+  bool get _isForm5Anglophone =>
+      _subsystem == ExamSubsystem.anglophone &&
+      _sector == ExamSector.general &&
+      _level?.code == 'en_general_form_5';
 
   Widget _levelInfo(AppTexts texts, ExamLevel level, String? curriculum) {
     final lines = <String>[
