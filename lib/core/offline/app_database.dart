@@ -138,9 +138,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<DownloadedFileRecord>> getDownloadedFiles({String? userId, String? courseId}) async {
     final where = <String>[];
-    final variables = <Variable<Object>>[];
-    if (userId != null) { where.add('user_id = ?'); variables.add(Variable(userId)); }
-    if (courseId != null) { where.add('course_id = ?'); variables.add(Variable(courseId)); }
+    final variables = <Object?>[];
+    if (userId != null) { where.add('user_id = ?'); variables.add(userId); }
+    if (courseId != null) { where.add('course_id = ?'); variables.add(courseId); }
     final rows = await customSelect(
       'SELECT * FROM downloaded_files${where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}'} ORDER BY COALESCE(last_opened_at, downloaded_at) ASC',
       variables: variables,
@@ -151,7 +151,7 @@ class AppDatabase extends _$AppDatabase {
   Future<DownloadedFileRecord?> getDownloadedFile(String resourceId, String userId) async {
     final rows = await customSelect(
       'SELECT * FROM downloaded_files WHERE resource_id = ? AND user_id = ? LIMIT 1',
-      variables: [Variable(resourceId), Variable(userId)],
+      variables: [resourceId, userId],
     ).get();
     return rows.isEmpty ? null : DownloadedFileRecord.fromRow(rows.first);
   }
@@ -166,7 +166,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> updateDownloadedFileStatus(String resourceId, String userId, String status) async {
-    await customStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?',  [Variable(status), Variable(resourceId), Variable(userId)]);
+    await customStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?',  [status, resourceId, userId]);
   }
 
   Future<void> markDownloadedFileOpened(String resourceId, String userId) async {
@@ -174,15 +174,15 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteDownloadedFile(String resourceId, String userId) async {
-    await customStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?',  [Variable(resourceId), Variable(userId)]);
+    await customStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?',  [resourceId, userId]);
   }
 
   Future<void> deleteAllDownloadedFiles(String userId) async {
-    await customStatement('DELETE FROM downloaded_files WHERE user_id = ?',  [Variable(userId)]);
+    await customStatement('DELETE FROM downloaded_files WHERE user_id = ?',  [userId]);
   }
 
   Future<int> downloadedFilesSize(String userId) async {
-    final rows = await customSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [Variable(userId)]).get();
+    final rows = await customSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [userId]).get();
     return rows.first.read<int>('total');
   }
 
@@ -218,13 +218,13 @@ class AppDatabase extends _$AppDatabase {
   Future<String?> getCachedProfile(String userId) async {
     final rows = await customSelect(
       'SELECT data_json FROM cached_profiles WHERE user_id = ? LIMIT 1',
-      variables: [Variable(userId)],
+      variables: [userId],
     ).get();
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
 
   Future<void> deleteCachedProfile(String userId) async {
-    await customStatement('DELETE FROM cached_profiles WHERE user_id = ?', [Variable(userId)]);
+    await customStatement('DELETE FROM cached_profiles WHERE user_id = ?', [userId]);
   }
 
   Future<void> saveCachedClassSubjects(String userId, String dataJson) async {
@@ -238,14 +238,14 @@ class AppDatabase extends _$AppDatabase {
   Future<String?> getCachedClassSubjects(String userId) async {
     final rows = await customSelect(
       'SELECT data_json FROM cached_class_subjects WHERE user_id = ? LIMIT 1',
-      variables: [Variable(userId)],
+      variables: [userId],
     ).get();
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
 
   Future<void> deleteCachedIdentity(String userId) async {
     await deleteCachedProfile(userId);
-    await customStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [Variable(userId)]);
+    await customStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [userId]);
   }
 
   Future<void> _createSmartLearningTables() async {
@@ -311,9 +311,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<QueryRow>> getOfflineQcm(String userId, String kind, {String? assignmentId}) async {
     final filter = assignmentId == null ? '' : ' AND assignment_id = ?';
-    final variables = <Variable<Object>>[Variable(userId), Variable(kind)];
+    final variables = <Variable<Object>>[userId, kind];
     if (assignmentId != null) {
-      variables.add(Variable(assignmentId));
+      variables.add(assignmentId);
     }
     return customSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', variables: variables).get();
   }
@@ -325,9 +325,9 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => customSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [Variable(userId)]).get();
+  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => customSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [userId]).get();
 
-  Future<void> deleteOfflineQcmQueue(String id, String userId) => customStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?',  [Variable(id), Variable(userId)]);
+  Future<void> deleteOfflineQcmQueue(String id, String userId) => customStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?',  [id, userId]);
 
   Future<void> saveSmartLesson({required String userId, required String id, required String dataJson}) async {
     await customStatement(
@@ -339,7 +339,7 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> getSmartLesson(String userId, String id) async {
     final rows = await customSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? AND id = ? LIMIT 1',
-      variables: [Variable(userId), Variable(id)],
+      variables: [userId, id],
     ).get();
     return rows.isEmpty ? null : rows.first;
   }
@@ -347,14 +347,14 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> latestSmartLesson(String userId) async {
     final rows = await customSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC LIMIT 1',
-      variables: [Variable(userId)],
+      variables: [userId],
     ).get();
     return rows.isEmpty ? null : rows.first;
   }
 
   Future<List<QueryRow>> getSmartLessons(String userId) => customSelect(
     'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC',
-    variables: [Variable(userId)],
+    variables: [userId],
   ).get();
 
   Future<void> queueSmartExercise({required String id, required String userId, required String lessonId, required String answersJson}) async {
@@ -366,12 +366,12 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<QueryRow>> getSmartExerciseQueue(String userId) => customSelect(
     'SELECT * FROM smart_exercise_queue WHERE user_id = ? ORDER BY queued_at',
-    variables: [Variable(userId)],
+    variables: [userId],
   ).get();
 
   Future<void> deleteSmartExerciseQueue(String id, String userId) => customStatement(
     'DELETE FROM smart_exercise_queue WHERE id = ? AND user_id = ?',
-     [Variable(id), Variable(userId)],
+     [id, userId],
   );
 
   Future<void> saveSmartExerciseResult({required String id, required String userId, required String lessonId, required String dataJson}) async {
@@ -384,7 +384,7 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> getSmartExerciseResult(String userId, String lessonId) async {
     final rows = await customSelect(
       'SELECT * FROM smart_exercise_results WHERE user_id = ? AND lesson_id = ? ORDER BY saved_at DESC LIMIT 1',
-      variables: [Variable(userId), Variable(lessonId)],
+      variables: [userId, lessonId],
     ).get();
     return rows.isEmpty ? null : rows.first;
   }
