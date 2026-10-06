@@ -29,6 +29,55 @@ class ProfileService {
     }
   }
 
+  Future<UserProfile?> _createMissingProfile(User user) async {
+    try {
+      final metadata = user.userMetadata ?? const <String, dynamic>{};
+      final appMetadata = user.appMetadata;
+
+      final requestedRole = appMetadata['role'] == 'admin'
+          ? 'admin'
+          : metadata['role'] == 'teacher'
+              ? 'teacher'
+              : 'student';
+
+      final profile = UserProfile(
+        id: user.id,
+        firstName: (metadata['first_name'] as String?)?.trim().isNotEmpty == true
+            ? (metadata['first_name'] as String).trim()
+            : ((user.email ?? '').split('@').first.isNotEmpty
+                ? (user.email ?? '').split('@').first
+                : 'Utilisateur'),
+        lastName: (metadata['last_name'] as String?)?.trim().isNotEmpty == true
+            ? (metadata['last_name'] as String).trim()
+            : 'Fise',
+        email: user.email,
+        role: requestedRole,
+        preferredLanguage:
+            metadata['preferred_language'] == 'en' ? 'en' : 'fr',
+        subsystem: metadata['subsystem'] as String?,
+        sector: metadata['sector'] as String?,
+        examLevelId: metadata['exam_level_id'] as String?,
+        examId: metadata['exam_id'] as String?,
+        seriesId: metadata['series_id'] as String?,
+        specialtyId: metadata['specialty_id'] as String?,
+        examLevel: metadata['exam_level'] as String?,
+        exam: metadata['exam'] as String?,
+        track: metadata['track'] as String?,
+        className: metadata['class_name'] as String?,
+      );
+
+      final data = await _client
+          .from('profiles')
+          .upsert(profile.toMap())
+          .select()
+          .single();
+
+      return UserProfile.fromMap(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<UserProfile> updateEditableProfile({
     required String firstName,
     required String lastName,
