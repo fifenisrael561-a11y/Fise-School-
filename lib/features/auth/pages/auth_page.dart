@@ -176,7 +176,8 @@ class _AuthPageState extends State<AuthPage> {
       if (mounted) {
         _showError(error.message);
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Fise School auth error: $error');
       if (mounted) {
         _showError(texts.networkError);
       }
