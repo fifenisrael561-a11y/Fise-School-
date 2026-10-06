@@ -116,7 +116,7 @@ class SupabaseSessionService implements SessionService {
 
         if (currentSession == null) {
           return SessionState.error(
-            'Votre session a expiré. ${error.message}',
+            'Votre session a expiré. $error.message',
           );
         }
       }
@@ -142,7 +142,7 @@ class SupabaseSessionService implements SessionService {
       );
     } catch (error) {
       return SessionState.error(
-        'Erreur de démarrage : ${error}',
+        'Erreur de démarrage : $error',
       );
     }
   }
