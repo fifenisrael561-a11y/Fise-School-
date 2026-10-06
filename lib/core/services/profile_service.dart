@@ -8,9 +8,7 @@ class ProfileService {
 
   Future<UserProfile?> getCurrentProfile() async {
     final user = _client.auth.currentUser;
-    if (user == null) {
-      return null;
-    }
+    if (user == null) return null;
 
     try {
       final data = await _client
@@ -34,9 +32,7 @@ class ProfileService {
     required String preferredLanguage,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) {
-      throw const AuthException('No active user session.');
-    }
+    if (user == null) throw const AuthException('No active user session.');
     final data = await _client
         .from('profiles')
         .update({
@@ -97,8 +93,8 @@ class ProfileService {
         .select()
         .single();
 
-    final profile = UserProfile.fromMap(data);
-    await OfflineRepository().saveProfileCache(profile);
-    return profile;
+    final savedProfile = UserProfile.fromMap(data);
+    await OfflineRepository().saveProfileCache(savedProfile);
+    return savedProfile;
   }
 }
