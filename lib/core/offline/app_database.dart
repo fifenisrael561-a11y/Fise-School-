@@ -199,7 +199,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> markDownloadedFileOpened(String resourceId, String userId) async {
-    await _debugStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [DateTime.now(.toIso8601String()), resourceId, userId]);
+    await _debugStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [DateTime.now().toIso8601String()), resourceId, userId]);
   }
 
   Future<void> deleteDownloadedFile(String resourceId, String userId) async {
@@ -240,7 +240,7 @@ class AppDatabase extends _$AppDatabase {
     await _debugStatement(
       'INSERT INTO cached_profiles(user_id,data_json,updated_at) VALUES(?,?,?) '
       'ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
-      [userId, dataJson, DateTime.now(.toIso8601String())],
+      [userId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -260,7 +260,7 @@ class AppDatabase extends _$AppDatabase {
     await _debugStatement(
       'INSERT INTO cached_class_subjects(cache_key,user_id,data_json,updated_at) VALUES(?,?,?,?) '
       'ON CONFLICT(cache_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
-      [userId, userId, dataJson, DateTime.now(.toIso8601String())],
+      [userId, userId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -334,7 +334,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> saveOfflineQcm({required String id, required String userId, required String kind, String? assignmentId, required String dataJson}) async {
     await _debugStatement(
       "INSERT INTO offline_qcm(id,user_id,kind,assignment_id,data_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id,user_id,kind) DO UPDATE SET assignment_id=excluded.assignment_id,data_json=excluded.data_json,updated_at=excluded.updated_at",
-       [id, userId, kind, assignmentId, dataJson, DateTime.now(.toIso8601String())],
+       [id, userId, kind, assignmentId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -350,7 +350,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> saveOfflineQcmQueue({required String id, required String userId, required String submissionId, required String assignmentId, required String dataJson}) async {
     await _debugStatement(
       "INSERT OR REPLACE INTO offline_qcm_queue(id,user_id,submission_id,assignment_id,data_json,queued_at) VALUES(?,?,?,?,?,?)",
-       [id, userId, submissionId, assignmentId, dataJson, DateTime.now(.toIso8601String())],
+       [id, userId, submissionId, assignmentId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -361,7 +361,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> saveSmartLesson({required String userId, required String id, required String dataJson}) async {
     await _debugStatement(
       'INSERT INTO smart_lessons_cache(id,user_id,data_json,cached_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id,data_json=excluded.data_json,cached_at=excluded.cached_at',
-       [id, userId, dataJson, DateTime.now(.toIso8601String())],
+       [id, userId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -389,7 +389,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> queueSmartExercise({required String id, required String userId, required String lessonId, required String answersJson}) async {
     await _debugStatement(
       'INSERT OR REPLACE INTO smart_exercise_queue(id,user_id,lesson_id,answers_json,queued_at) VALUES(?,?,?,?,?)',
-       [id, userId, lessonId, answersJson, DateTime.now(.toIso8601String())],
+       [id, userId, lessonId, answersJson, DateTime.now().toIso8601String())],
     );
   }
 
@@ -406,7 +406,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> saveSmartExerciseResult({required String id, required String userId, required String lessonId, required String dataJson}) async {
     await _debugStatement(
       'INSERT OR REPLACE INTO smart_exercise_results(id,user_id,lesson_id,data_json,saved_at) VALUES(?,?,?,?,?)',
-       [id, userId, lessonId, dataJson, DateTime.now(.toIso8601String())],
+       [id, userId, lessonId, dataJson, DateTime.now().toIso8601String())],
     );
   }
 
