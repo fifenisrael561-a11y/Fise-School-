@@ -129,7 +129,7 @@ class AppDatabase extends _$AppDatabase {
     List<Variable<Object>> variables = const [],
   }) async {
     try {
-      return await customSelect(sql, variables: variables);
+      return await customSelect(sql, variables: variables).get();
     } catch (error, stackTrace) {
       print('[FISE-DRIFT] SQL SELECT ERROR');
       print('[FISE-DRIFT] SQL: $sql');
