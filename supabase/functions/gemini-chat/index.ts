@@ -239,28 +239,43 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     if (message) currentParts.push({ text: message });
     contents.push({ role: "user", parts: currentParts });
 
-    const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "x-goog-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: schoolContext }] },
-          contents,
-          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-        }),
-      },
-    );
+    const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const models = [...new Set([configuredModel, "gemini-3.7-flash", "gemini-3.6-flash"])];
+    let data: any = null;
+    let lastError = "Gemini request failed.";
+    for (const model of models) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "x-goog-api-key": apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: schoolContext }] },
+              contents,
+              generationConfig: { maxOutputTokens: 2048 },
+            }),
+            signal: controller.signal,
+          },
+        );
+        data = await response.json();
+        if (response.ok) break;
+        lastError = data?.error?.message ?? `Gemini request failed on ${model}.`;
+        if (![429, 500, 502, 503, 504].includes(response.status)) break;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : "Gemini request failed.";
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error?.message ?? "Gemini request failed.");
+    if (!data?.candidates?.length) {
+      throw new Error(lastError);
     }
 
     const text = data?.candidates?.[0]?.content?.parts
