@@ -60,29 +60,6 @@ class PublicHomePage extends StatelessWidget {
       ],
     );
 
-    final actions = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Semantics(
-          label: '${texts.login} dans ${texts.appName}',
-          button: true,
-          child: TextButton(
-            onPressed: () => _openAuth(context),
-            child: Text(texts.login),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Semantics(
-          label: '${texts.register} dans ${texts.appName}',
-          button: true,
-          child: FilledButton(
-            onPressed: () => _openAuth(context, register: true),
-            child: Text(texts.register),
-          ),
-        ),
-      ],
-    );
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: narrow
@@ -94,8 +71,6 @@ class PublicHomePage extends StatelessWidget {
                     _languageMenu(texts),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Align(alignment: Alignment.centerRight, child: actions),
               ],
             )
           : Row(
@@ -103,7 +78,6 @@ class PublicHomePage extends StatelessWidget {
                 Expanded(
                   child: Align(alignment: Alignment.centerLeft, child: brand),
                 ),
-                actions,
                 const SizedBox(width: 8),
                 _languageMenu(texts),
               ],
@@ -260,43 +234,22 @@ class PublicHomePage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              Semantics(
-                label: '${texts.login} to ${texts.appName}',
-                button: true,
-                child: FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF166534),
-                    minimumSize: const Size(160, 48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: () => _openAuth(context),
-                  child: Text(texts.login),
+          SizedBox(
+            width: 220,
+            height: 50,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF166534),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              Semantics(
-                label: '${texts.register} on ${texts.appName}',
-                button: true,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F3D1F),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(170, 48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: () => _openAuth(context, register: true),
-                  child: Text(texts.register),
-                ),
+              onPressed: () => _openAuth(context),
+              child: Text(
+                isFrench ? 'Inscription / Connexion' : 'Sign up / Log in',
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -368,21 +321,8 @@ class PublicHomePage extends StatelessWidget {
         : 'Accéder à l’espace enseignant';
 
     return Semantics(
-      button: true,
       label: routeDescription,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AuthPage(
-              locale: locale,
-              startInRegisterMode: true,
-              initialRole: isStudent ? 'student' : 'teacher',
-            ),
-          ),
-        ),
-        child: Ink(
+      child: Ink(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
