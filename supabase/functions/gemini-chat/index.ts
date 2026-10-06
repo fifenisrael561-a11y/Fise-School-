@@ -143,7 +143,7 @@ serve(async (req) => {
 
     const accessToken = authHeader.slice("Bearer ".length).trim();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? (() => {\n      try { return JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}").default ?? ""; } catch { return ""; }\n    })();
     const apiKey = Deno.env.get("GEMINI_API_KEY");
 
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -196,7 +196,7 @@ serve(async (req) => {
       };
     }
 
-    const courseSearch = await findStudentCourseContext(
+    let courseSearch = { found: false, context: "" };\n    try {\n      courseSearch = await findStudentCourseContext(
       createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: `Bearer ${accessToken}` } },
         auth: { persistSession: false, autoRefreshToken: false },
@@ -234,7 +234,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     if (message) currentParts.push({ text: message });
     contents.push({ role: "user", parts: currentParts });
 
-    const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+    const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);
     const response = await fetch(
@@ -248,7 +248,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: schoolContext }] },
           contents,
-          generationConfig: { temperature: 0.4 },
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
         }),
       },
     );
