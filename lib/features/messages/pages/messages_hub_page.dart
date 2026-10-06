@@ -8,6 +8,7 @@ import '../../../models/school_class.dart';
 import '../../../models/user_profile.dart';
 import 'group_chat_page.dart';
 import 'private_messages_page.dart';
+import '../../student/dialogs/access_code_dialog.dart';
 
 /// Espace Messages façon WhatsApp : liste des groupes et accès aux messages
 /// privés. Un élève n'entre dans un groupe qu'avec le code unique créé par
@@ -269,6 +270,21 @@ class _MessagesHubPageState extends State<MessagesHubPage> {
       appBar: AppBar(
         title: Text(_fr ? 'Messages' : 'Messages'),
         actions: [
+          if (!_isTeacher)
+            IconButton(
+              tooltip: _fr ? 'Rejoindre un enseignant' : 'Join a teacher',
+              icon: const Icon(Icons.vpn_key_outlined),
+              onPressed: () async {
+                await showDialog(
+                  context: context,
+                  builder: (_) => AccessCodeDialog(
+                    locale: widget.locale,
+                    profile: widget.profile,
+                    onSuccess: _reload,
+                  ),
+                );
+              },
+            ),
           IconButton(
             tooltip: _fr ? 'Prendre une photo' : 'Take a photo',
             icon: const Icon(Icons.camera_alt_rounded),
