@@ -100,9 +100,9 @@ class TeacherAccessCodeService {
     }
     final row = Map<String, dynamic>.from(response.first as Map);
     return {
-      'teacherId': String(row['teacher_id']),
-      'classId': String(row['class_id']),
-      'accessCodeId': String(row['access_code_id']),
+      'teacherId': row['teacher_id']?.toString() ?? '',
+      'classId': row['class_id']?.toString() ?? '',
+      'accessCodeId': row['access_code_id']?.toString() ?? '',
     };
   }
 
