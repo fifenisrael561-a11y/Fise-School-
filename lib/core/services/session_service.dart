@@ -198,6 +198,37 @@ class SupabaseSessionService implements SessionService {
       }
     }
 
+    Future<void> refreshAfterSignIn() async {
+      final currentGeneration = ++generation;
+
+      // A load started before the successful login may still be in
+      // _loadInFlight and can contain the old signed-out state. Do not reuse
+      // that Future for signedIn: wait for the new Supabase session, then
+      // reload the profile from the authenticated client.
+      for (var attempt = 0; attempt < 10; attempt++) {
+        if (_client.auth.currentSession != null) {
+          final state = await _loadInternal();
+
+          if (currentGeneration == generation && !controller.isClosed) {
+            controller.add(state);
+          }
+          return;
+        }
+
+        if (attempt < 9) {
+          await Future<void>.delayed(
+            const Duration(milliseconds: 100),
+          );
+        }
+      }
+
+      // If Supabase did not expose the session in time, fall back to the
+      // normal deduplicated loader instead of emitting a stale state.
+      if (currentGeneration == generation && !controller.isClosed) {
+        await refresh();
+      }
+    }
+
     controller = StreamController<SessionState>(
       onListen: () {
         subscription = _client.auth.onAuthStateChange.listen(
@@ -208,7 +239,9 @@ class SupabaseSessionService implements SessionService {
               case AuthChangeEvent.tokenRefreshed:
                 return;
               case AuthChangeEvent.signedOut:
+                refresh();
               case AuthChangeEvent.signedIn:
+                refreshAfterSignIn();
               case AuthChangeEvent.initialSession:
               case AuthChangeEvent.userUpdated:
               case AuthChangeEvent.userDeleted:
