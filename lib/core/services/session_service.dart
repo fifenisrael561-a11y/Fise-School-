@@ -62,13 +62,28 @@ class SupabaseSessionService implements SessionService {
   @override
   Future<SessionState> load() async {
     try {
-      final session = _client.auth.currentSession;
+      var session = _client.auth.currentSession;
+
+      // On Android, the persisted session can be present but its access token
+      // may be stale while the Auth client is still restoring/refreshing it.
+      // Refresh once before deciding that the user is signed out.
+      if (session != null) {
+        try {
+          final refreshed = await _client.auth.refreshSession();
+          session = refreshed.session ?? _client.auth.currentSession;
+        } on AuthException {
+          // Keep the existing session if Supabase could not refresh it yet.
+        }
+      }
+
       if (session == null) {
         return const SessionState.signedOut();
       }
 
       final profile = await _fetchProfile();
       if (profile == null) {
+        // Never sign the user out just because the profile query temporarily
+        // returned no row. The Auth session is still valid.
         return const SessionState.profileMissing();
       }
       return SessionState.authenticated(profile);
