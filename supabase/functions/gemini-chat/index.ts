@@ -207,6 +207,9 @@ serve(async (req) => {
       message,
       language,
     );
+    } catch {
+      // Course search is optional and must never block the AI.
+    }
 
     const courseContextInstruction = courseSearch.found
       ? (language === "en"
