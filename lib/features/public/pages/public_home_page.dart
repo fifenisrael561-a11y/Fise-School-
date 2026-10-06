@@ -323,68 +323,70 @@ class PublicHomePage extends StatelessWidget {
     return Semantics(
       label: routeDescription,
       child: Ink(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFDCEBE0)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5EC),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  isStudent ? Icons.school_rounded : Icons.co_present_rounded,
-                  color: const Color(0xFF166534),
-                  size: 30,
-                ),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFDCEBE0)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5EC),
+                borderRadius: BorderRadius.circular(18),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF123524),
-                      ),
+              child: Icon(
+                isStudent ? Icons.school_rounded : Icons.co_present_rounded,
+                color: const Color(0xFF166534),
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF123524),
                     ),
-                    const SizedBox(height: 7),
-                    Text(
-                      description,
-                      style: TextStyle(color: Colors.grey.shade600, height: 1.45),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      height: 1.45,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Text(
-                          texts.continueText,
-                          style: const TextStyle(
-                            color: Color(0xFF166534),
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text(
+                        texts.continueText,
+                        style: const TextStyle(
                           color: Color(0xFF166534),
-                          size: 19,
+                          fontWeight: FontWeight.w800,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: Color(0xFF166534),
+                        size: 19,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
