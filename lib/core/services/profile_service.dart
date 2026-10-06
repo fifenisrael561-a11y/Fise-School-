@@ -97,6 +97,8 @@ class ProfileService {
         .select()
         .single();
 
-    return UserProfile.fromMap(data);
+    final profile = UserProfile.fromMap(data);
+    await OfflineRepository().saveProfileCache(profile);
+    return profile;
   }
 }
