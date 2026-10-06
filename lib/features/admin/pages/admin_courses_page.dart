@@ -106,7 +106,11 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
 
   Future<void> _createCourse() async {
     final classes = List<Map<String, dynamic>>.from(
-      await _client.from('school_classes').select('id,display_name,name,subsystem,sector,is_active').eq('is_active', true).order('display_name'),
+      await _client
+          .from('school_classes')
+          .select('id,display_name,name,subsystem,sector,is_active')
+          .eq('is_active', true)
+          .order('display_name'),
     );
     if (!mounted) {
       return;
@@ -116,7 +120,7 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
       return;
     }
 
-    Map<String, dynamic>? selectedClass = classes.first;
+    final selectedClassIds = <String>{};
     List<Map<String, dynamic>> subjects = [];
     Map<String, dynamic>? selectedSubject;
     List<Map<String, dynamic>> curricula = [];
@@ -133,26 +137,80 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     bool published = true;
     bool saving = false;
 
+    List<Map<String, dynamic>> get selectedClasses => classes
+        .where((c) => selectedClassIds.contains(c['id'].toString()))
+        .toList(growable: false);
+
     Future<void> loadSubjects(StateSetter setDialog) async {
-      final rows = await _client.from('class_subjects').select('subject_id,subjects(id,name_fr,name_en,code)').eq('class_id', selectedClass!['id']).eq('is_active', true).order('position');
-      subjects = List<Map<String, dynamic>>.from(rows);
-      selectedSubject = subjects.isEmpty ? null : subjects.first['subjects'] as Map<String, dynamic>;
+      final targets = selectedClasses;
+      subjects = [];
+      selectedSubject = null;
       curricula = [];
       chapters = [];
       selectedCurriculum = null;
       selectedChapter = null;
-      if (selectedSubject != null) {
-        curricula = List<Map<String, dynamic>>.from(await _client.from('curricula').select().eq('subject_id', selectedSubject!['id']).eq('is_active', true).order('title_fr'));
+
+      if (targets.isEmpty) {
+        setDialog(() {});
+        return;
+      }
+
+      Map<String, Map<String, dynamic>>? common;
+      for (final target in targets) {
+        final rows = await _client
+            .from('class_subjects')
+            .select('subject_id,subjects(id,name_fr,name_en,code,subsystem,sector)')
+            .eq('class_id', target['id'])
+            .eq('is_active', true)
+            .order('position');
+
+        final byId = <String, Map<String, dynamic>>{};
+        for (final row in rows) {
+          final raw = row['subjects'];
+          if (raw is Map) {
+            final subject = Map<String, dynamic>.from(raw);
+            byId[subject['id'].toString()] = subject;
+          }
+        }
+
+        if (common == null) {
+          common = byId;
+        } else {
+          common = {
+            for (final entry in common.entries)
+              if (byId.containsKey(entry.key)) entry.key: entry.value,
+          };
+        }
+      }
+
+      subjects = (common ?? <String, Map<String, dynamic>>{}).values.toList();
+      if (subjects.isNotEmpty) {
+        selectedSubject = subjects.first;
+        curricula = List<Map<String, dynamic>>.from(
+          await _client
+              .from('curricula')
+              .select()
+              .eq('subject_id', selectedSubject!['id'])
+              .eq('is_active', true)
+              .order('title_fr'),
+        );
         selectedCurriculum = curricula.isEmpty ? null : curricula.first;
         if (selectedCurriculum != null) {
-          chapters = List<Map<String, dynamic>>.from(await _client.from('course_chapters').select().eq('curriculum_id', selectedCurriculum!['id']).eq('is_active', true).order('position'));
+          chapters = List<Map<String, dynamic>>.from(
+            await _client
+                .from('course_chapters')
+                .select()
+                .eq('curriculum_id', selectedCurriculum!['id'])
+                .eq('is_active', true)
+                .order('position'),
+          );
           selectedChapter = chapters.isEmpty ? null : chapters.first;
         }
       }
+
       setDialog(() {});
     }
 
-    await loadSubjects((_) {});
     if (!mounted) {
       return;
     }
@@ -165,87 +223,319 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
         return StatefulBuilder(
           builder: (context, setDialog) {
             return Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(_fr ? 'Créer un contenu pédagogique' : 'Create educational content', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<Map<String, dynamic>>(
-                      initialValue: selectedClass,
-                      decoration: InputDecoration(labelText: _fr ? 'Salle de classe' : 'Classroom'),
-                      items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c['display_name']?.toString() ?? c['name']?.toString() ?? ''))).toList(),
-                      onChanged: saving ? null : (value) async { selectedClass = value; await loadSubjects(setDialog); },
+                    Text(
+                      _fr ? 'Diffuser un cours' : 'Distribute a course',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    Text(
+                      _fr
+                          ? 'Choisissez une, plusieurs ou toutes les salles. Le cours sera créé séparément dans chaque salle sélectionnée et chaque élève ne verra que le cours de sa salle.'
+                          : 'Choose one, several or all classrooms. The course is created separately in each selected classroom and each student only sees their classroom course.',
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _fr ? 'Salles de diffusion' : 'Target classrooms',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  selectedClassIds
+                                    ..clear()
+                                    ..addAll(classes.map((c) => c['id'].toString()));
+                                  await loadSubjects(setDialog);
+                                },
+                          child: Text(_fr ? 'Toutes' : 'All'),
+                        ),
+                        TextButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  selectedClassIds.clear();
+                                  await loadSubjects(setDialog);
+                                },
+                          child: Text(_fr ? 'Aucune' : 'Clear'),
+                        ),
+                      ],
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: classes.map((schoolClass) {
+                        final id = schoolClass['id'].toString();
+                        final selected = selectedClassIds.contains(id);
+                        return FilterChip(
+                          label: Text(
+                            schoolClass['display_name']?.toString() ??
+                                schoolClass['name']?.toString() ??
+                                '',
+                          ),
+                          selected: selected,
+                          onSelected: saving
+                              ? null
+                              : (value) async {
+                                  if (value) {
+                                    selectedClassIds.add(id);
+                                  } else {
+                                    selectedClassIds.remove(id);
+                                  }
+                                  await loadSubjects(setDialog);
+                                },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    if (selectedClasses.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          _fr
+                              ? 'La matière doit exister dans toutes les salles sélectionnées.'
+                              : 'The subject must exist in every selected classroom.',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     DropdownButtonFormField<Map<String, dynamic>>(
                       initialValue: selectedSubject,
-                      decoration: InputDecoration(labelText: _fr ? 'Matière de cette salle' : 'Subject in this classroom'),
-                      items: subjects.map((s) { final m = Map<String, dynamic>.from(s['subjects'] as Map); return DropdownMenuItem(value: m, child: Text(_nestedName(m, 'name_fr', 'name_en'))); }).toList(),
-                      onChanged: saving ? null : (value) async {
-                        selectedSubject = value; selectedCurriculum = null; selectedChapter = null; chapters = [];
-                        if (value != null) { curricula = List<Map<String, dynamic>>.from(await _client.from('curricula').select().eq('subject_id', value['id']).eq('is_active', true).order('title_fr')); selectedCurriculum = curricula.isEmpty ? null : curricula.first; if (selectedCurriculum != null) { chapters = List<Map<String, dynamic>>.from(await _client.from('course_chapters').select().eq('curriculum_id', selectedCurriculum!['id']).eq('is_active', true).order('position')); selectedChapter = chapters.isEmpty ? null : chapters.first; } }
-                        setDialog(() {});
-                      },
+                      decoration: InputDecoration(
+                        labelText: _fr ? 'Matière' : 'Subject',
+                      ),
+                      items: subjects
+                          .map(
+                            (s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(_nestedName(s, 'name_fr', 'name_en')),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) async {
+                              selectedSubject = value;
+                              selectedCurriculum = null;
+                              selectedChapter = null;
+                              chapters = [];
+                              curricula = [];
+                              if (value != null) {
+                                curricula = List<Map<String, dynamic>>.from(
+                                  await _client
+                                      .from('curricula')
+                                      .select()
+                                      .eq('subject_id', value['id'])
+                                      .eq('is_active', true)
+                                      .order('title_fr'),
+                                );
+                                selectedCurriculum =
+                                    curricula.isEmpty ? null : curricula.first;
+                                if (selectedCurriculum != null) {
+                                  chapters = List<Map<String, dynamic>>.from(
+                                    await _client
+                                        .from('course_chapters')
+                                        .select()
+                                        .eq(
+                                          'curriculum_id',
+                                          selectedCurriculum!['id'],
+                                        )
+                                        .eq('is_active', true)
+                                        .order('position'),
+                                  );
+                                  selectedChapter =
+                                      chapters.isEmpty ? null : chapters.first;
+                                }
+                              }
+                              setDialog(() {});
+                            },
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Map<String, dynamic>>(
                       initialValue: selectedCurriculum,
-                      decoration: InputDecoration(labelText: _fr ? 'Programme' : 'Curriculum'),
-                      items: curricula.map((c) => DropdownMenuItem(value: c, child: Text(_nestedName(c, 'title_fr', 'title_en')))).toList(),
-                      onChanged: saving ? null : (value) async { selectedCurriculum = value; selectedChapter = null; chapters = value == null ? [] : List<Map<String, dynamic>>.from(await _client.from('course_chapters').select().eq('curriculum_id', value['id']).eq('is_active', true).order('position')); selectedChapter = chapters.isEmpty ? null : chapters.first; setDialog(() {}); },
+                      decoration: InputDecoration(
+                        labelText: _fr ? 'Programme' : 'Curriculum',
+                      ),
+                      items: curricula
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(
+                                _nestedName(c, 'title_fr', 'title_en'),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) async {
+                              selectedCurriculum = value;
+                              selectedChapter = null;
+                              chapters = value == null
+                                  ? []
+                                  : List<Map<String, dynamic>>.from(
+                                      await _client
+                                          .from('course_chapters')
+                                          .select()
+                                          .eq(
+                                            'curriculum_id',
+                                            value['id'],
+                                          )
+                                          .eq('is_active', true)
+                                          .order('position'),
+                                    );
+                              selectedChapter =
+                                  chapters.isEmpty ? null : chapters.first;
+                              setDialog(() {});
+                            },
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Map<String, dynamic>>(
                       initialValue: selectedChapter,
-                      decoration: InputDecoration(labelText: _fr ? 'Chapitre' : 'Chapter'),
-                      items: chapters.map((c) => DropdownMenuItem(value: c, child: Text(_nestedName(c, 'title_fr', 'title_en')))).toList(),
-                      onChanged: saving ? null : (value) => setDialog(() => selectedChapter = value),
+                      decoration: InputDecoration(
+                        labelText: _fr ? 'Chapitre' : 'Chapter',
+                      ),
+                      items: chapters
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(
+                                _nestedName(c, 'title_fr', 'title_en'),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) => setDialog(() => selectedChapter = value),
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: titleFr, decoration: InputDecoration(labelText: 'Titre français *')),
+                    TextField(
+                      controller: titleFr,
+                      decoration: const InputDecoration(
+                        labelText: 'Titre français *',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: titleEn, decoration: InputDecoration(labelText: 'English title *')),
+                    TextField(
+                      controller: titleEn,
+                      decoration: const InputDecoration(
+                        labelText: 'English title *',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: descFr, maxLines: 2, decoration: InputDecoration(labelText: _fr ? 'Description' : 'Description')),
+                    TextField(
+                      controller: descFr,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: _fr ? 'Description' : 'Description',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: contentFr, maxLines: 6, decoration: InputDecoration(labelText: _fr ? 'Contenu du cours (français)' : 'Course content (French)')),
+                    TextField(
+                      controller: contentFr,
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        labelText: _fr
+                            ? 'Contenu du cours (français)'
+                            : 'Course content (French)',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: contentEn, maxLines: 6, decoration: const InputDecoration(labelText: 'Course content (English)')),
-                    SwitchListTile(value: published, onChanged: saving ? null : (v) => setDialog(() => published = v), title: Text(_fr ? 'Publier immédiatement' : 'Publish immediately'), contentPadding: EdgeInsets.zero),
+                    TextField(
+                      controller: contentEn,
+                      maxLines: 6,
+                      decoration: const InputDecoration(
+                        labelText: 'Course content (English)',
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: published,
+                      onChanged: saving
+                          ? null
+                          : (v) => setDialog(() => published = v),
+                      title: Text(
+                        _fr ? 'Publier immédiatement' : 'Publish immediately',
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                     const SizedBox(height: 8),
                     FilledButton.icon(
-                      onPressed: saving || selectedSubject == null || selectedCurriculum == null || selectedChapter == null || titleFr.text.trim().isEmpty || titleEn.text.trim().isEmpty ? null : () async {
-                        setDialog(() => saving = true);
-                        try {
-                          await _courses.saveCourse(
-                            curriculumId: selectedCurriculum!['id'].toString(),
-                            chapterId: selectedChapter!['id'].toString(),
-                            subjectId: selectedSubject!['id'].toString(),
-                            teacherId: _client.auth.currentUser!.id,
-                            classId: selectedClass!['id'].toString(),
-                            titleFr: titleFr.text,
-                            titleEn: titleEn.text,
-                            descriptionFr: descFr.text,
-                            descriptionEn: descEn.text,
-                            contentFr: contentFr.text,
-                            contentEn: contentEn.text,
-                            status: published ? 'published' : 'draft',
-                          );
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext);
-                          }
-                          await _load();
-                        } catch (e) {
-                          setDialog(() => saving = false);
-                          if (sheetContext.mounted) {
-                            ScaffoldMessenger.of(sheetContext).showSnackBar(SnackBar(content: Text(e.toString())));
-                          }
-                        }
-                      },
+                      onPressed: saving ||
+                              selectedClasses.isEmpty ||
+                              selectedSubject == null ||
+                              selectedCurriculum == null ||
+                              selectedChapter == null ||
+                              titleFr.text.trim().isEmpty ||
+                              titleEn.text.trim().isEmpty
+                          ? null
+                          : () async {
+                              setDialog(() => saving = true);
+                              try {
+                                var created = 0;
+                                for (final target in selectedClasses) {
+                                  await _courses.saveCourse(
+                                    curriculumId:
+                                        selectedCurriculum!['id'].toString(),
+                                    chapterId:
+                                        selectedChapter!['id'].toString(),
+                                    subjectId:
+                                        selectedSubject!['id'].toString(),
+                                    teacherId: _client.auth.currentUser!.id,
+                                    classId: target['id'].toString(),
+                                    titleFr: titleFr.text,
+                                    titleEn: titleEn.text,
+                                    descriptionFr: descFr.text,
+                                    descriptionEn: descEn.text,
+                                    contentFr: contentFr.text,
+                                    contentEn: contentEn.text,
+                                    status: published ? 'published' : 'draft',
+                                  );
+                                  created++;
+                                }
+
+                                if (sheetContext.mounted) {
+                                  Navigator.pop(sheetContext);
+                                }
+                                await _load();
+
+                                if (mounted) {
+                                  _snack(
+                                    _fr
+                                        ? 'Cours diffusé dans $created salle(s).'
+                                        : 'Course distributed to $created classroom(s).',
+                                  );
+                                }
+                              } catch (e) {
+                                setDialog(() => saving = false);
+                                if (sheetContext.mounted) {
+                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    SnackBar(content: Text(e.toString())),
+                                  );
+                                }
+                              }
+                            },
                       icon: const Icon(Icons.publish_rounded),
-                      label: Text(_fr ? 'Créer le cours' : 'Create course'),
+                      label: Text(
+                        _fr ? 'Diffuser le cours' : 'Distribute course',
+                      ),
                     ),
                   ],
                 ),
@@ -255,7 +545,13 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
         );
       },
     );
-    titleFr.dispose(); titleEn.dispose(); descFr.dispose(); descEn.dispose(); contentFr.dispose(); contentEn.dispose();
+
+    titleFr.dispose();
+    titleEn.dispose();
+    descFr.dispose();
+    descEn.dispose();
+    contentFr.dispose();
+    contentEn.dispose();
   }
 
   Future<void> _addResource(Map<String, dynamic> course) async {
