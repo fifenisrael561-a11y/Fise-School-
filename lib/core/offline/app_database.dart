@@ -195,7 +195,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> updateDownloadedFileStatus(String resourceId, String userId, String status) async {
-    await _debugStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?', [Variable.withString(status) as Variable<Object>, Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
+    await _debugStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?', [status, resourceId, userId]);
   }
 
   Future<void> markDownloadedFileOpened(String resourceId, String userId) async {
@@ -207,7 +207,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteAllDownloadedFiles(String userId) async {
-    await _debugStatement('DELETE FROM downloaded_files WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
+    await _debugStatement('DELETE FROM downloaded_files WHERE user_id = ?', [userId]);
   }
 
   Future<int> downloadedFilesSize(String userId) async {
@@ -356,7 +356,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<QueryRow>> getOfflineQcmQueue(String userId) => _debugSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [Variable.withString(userId) as Variable<Object>]);
 
-  Future<void> deleteOfflineQcmQueue(String id, String userId) => _debugStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?', [Variable.withString(id) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
+  Future<void> deleteOfflineQcmQueue(String id, String userId) => _debugStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?', [id, userId]);
 
   Future<void> saveSmartLesson({required String userId, required String id, required String dataJson}) async {
     await _debugStatement(
