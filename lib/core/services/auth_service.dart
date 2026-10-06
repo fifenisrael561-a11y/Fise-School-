@@ -17,7 +17,8 @@ class AuthService {
       password: password,
     );
 
-    await _ensureProfile(response.user);
+    // Supabase creates the application profile through the database trigger.
+    // Do not make a successful password login depend on a second profile write.
   }
 
   /// Retourne true si une session est créée immédiatement.
@@ -84,36 +85,6 @@ class AuthService {
     }
 
     return response.session != null;
-  }
-
-  Future<void> _ensureProfile(User? user) async {
-    if (user == null) {
-      return;
-    }
-
-    final existing = await _profileService.getCurrentProfile();
-    if (existing != null) {
-      return;
-    }
-
-    final metadata = user.userMetadata ?? const <String, dynamic>{};
-
-    await _profileService.saveCurrentProfile(
-      firstName: metadata['first_name'] as String? ?? '',
-      lastName: metadata['last_name'] as String? ?? '',
-      email: user.email ?? (metadata['email'] as String? ?? ''),
-      role: metadata['role'] as String? ?? 'student',
-      subsystem: metadata['subsystem'] as String?,
-      sector: metadata['sector'] as String?,
-      examLevelId: metadata['exam_level_id'] as String?,
-      examId: metadata['exam_id'] as String?,
-      seriesId: metadata['series_id'] as String?,
-      specialtyId: metadata['specialty_id'] as String?,
-      examLevel: metadata['exam_level'] as String?,
-      exam: metadata['exam'] as String?,
-      track: metadata['track'] as String?,
-      className: metadata['class_name'] as String?,
-    );
   }
 
   Future<void> signOut() async {
