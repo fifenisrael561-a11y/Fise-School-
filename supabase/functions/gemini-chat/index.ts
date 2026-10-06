@@ -196,7 +196,9 @@ serve(async (req) => {
       };
     }
 
-    let courseSearch = { found: false, context: "" };\n    try {\n      courseSearch = await findStudentCourseContext(
+    let courseSearch = { found: false, context: "" };
+    try {
+      courseSearch = await findStudentCourseContext(
       createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: `Bearer ${accessToken}` } },
         auth: { persistSession: false, autoRefreshToken: false },
