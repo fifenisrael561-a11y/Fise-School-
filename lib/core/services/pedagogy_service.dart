@@ -44,46 +44,50 @@ class CourseService {
       return const [];
     }
 
-    // The student's active class is the source of truth. This prevents a
-    // Francophone student from seeing Anglophone classes/subjects and vice versa.
-    final memberships = await _client
-        .from('class_students')
-        .select('class_id, school_classes(subsystem, sector)')
-        .eq('student_id', profile.id)
-        .eq('is_active', true);
+    try {
+      final memberships = await _client
+          .from('class_students')
+          .select('class_id, school_classes(subsystem, sector)')
+          .eq('student_id', profile.id)
+          .eq('is_active', true);
 
-    final classIds = <String>[];
-    for (final row in memberships) {
-      final context = row['school_classes'];
-      if (context is Map &&
-          context['subsystem']?.toString() == profile.subsystem &&
-          context['sector']?.toString() == profile.sector) {
-        classIds.add(row['class_id'] as String);
+      final classIds = <String>[];
+      for (final row in memberships) {
+        final context = row['school_classes'];
+        if (context is Map &&
+            context['subsystem']?.toString() == profile.subsystem &&
+            context['sector']?.toString() == profile.sector) {
+          classIds.add(row['class_id'] as String);
+        }
       }
-    }
-    if (classIds.isEmpty) {
-      return const [];
-    }
+      if (classIds.isEmpty) {
+        return const [];
+      }
 
-    final rows = await _client
-        .from('class_subjects')
-        .select('subject_id, is_compulsory, option_group, position, subjects(*)')
-        .inFilter('class_id', classIds)
-        .eq('is_active', true)
-        .order('position');
+      final rows = await _client
+          .from('class_subjects')
+          .select('subject_id, is_compulsory, option_group, position, subjects(*)')
+          .inFilter('class_id', classIds)
+          .eq('is_active', true)
+          .order('position');
 
-    final seen = <String>{};
-    final result = <ClassSubjectEntry>[];
-    for (final row in rows) {
-      final entry = ClassSubjectEntry.fromMap(Map<String, dynamic>.from(row));
-      if (entry.subject.subsystem.name != profile.subsystem || entry.subject.sector.name != profile.sector) {
-        continue;
+      final seen = <String>{};
+      final result = <ClassSubjectEntry>[];
+      for (final row in rows) {
+        final entry = ClassSubjectEntry.fromMap(Map<String, dynamic>.from(row));
+        if (entry.subject.subsystem.name != profile.subsystem ||
+            entry.subject.sector.name != profile.sector) {
+          continue;
+        }
+        if (seen.add(entry.subject.id)) {
+          result.add(entry);
+        }
       }
-      if (seen.add(entry.subject.id)) {
-        result.add(entry);
-      }
+      await OfflineRepository().saveClassSubjectsCache(profile.id, result);
+      return result;
+    } catch (_) {
+      return OfflineRepository().getClassSubjectsCache(profile.id);
     }
-    return result;
   }
 
   Future<List<Subject>> listSubjects(UserProfile profile) async {
