@@ -207,27 +207,8 @@ as $$
       select 1
       from public.teacher_access_memberships m
       where
-        (
-          m.student_id = auth.uid()
-          and m.teacher_id = target_user_id
-        )
-        or (
-          m.teacher_id = auth.uid()
-          and m.student_id = target_user_id
-        )
-    )
-    or exists (
-      select 1
-      from public.class_students cs
-      join public.class_teachers ct on ct.class_id = cs.class_id
-      where cs.is_active and ct.is_active
-        and (
-          (cs.student_id = auth.uid() and ct.teacher_id = target_user_id
-           and public.teacher_can_manage_class(cs.class_id, target_user_id))
-          or
-          (ct.teacher_id = auth.uid() and cs.student_id = target_user_id
-           and public.teacher_can_manage_class(cs.class_id, auth.uid()))
-        )
+        (m.student_id = auth.uid() and m.teacher_id = target_user_id)
+        or (m.teacher_id = auth.uid() and m.student_id = target_user_id)
     );
 $$;
 
