@@ -210,6 +210,11 @@ class SupabaseSessionService implements SessionService {
             refresh();
           },
         );
+
+        // Émet immédiatement l'état courant. Cela évite qu'un retour depuis
+        // l'écran de connexion reste temporairement sur l'accueil public
+        // lorsque l'événement AuthStateChange a déjà été émis.
+        refresh();
       },
       onCancel: () async {
         await subscription?.cancel();
