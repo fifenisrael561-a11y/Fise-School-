@@ -122,8 +122,8 @@ class _DailyLessonPageState extends State<DailyLessonPage> {
     if (prompt == null || prompt.isEmpty || !mounted) return;
 
     final exerciseContext = _fr
-        ? 'Leçon: ' + (_lesson?.text ?? '') + '\nExercice d’application: ' + question.question + '\nChoix: ' + question.choices.join(' | ')
-        : 'Lesson: ' + (_lesson?.text ?? '') + '\nApplication exercise: ' + question.question + '\nChoices: ' + question.choices.join(' | ');
+        ? 'Leçon: ${_lesson?.text ?? ''}\nExercice d’application: ${question.question}\nChoix: ${question.choices.join(' | ')}'
+        : 'Lesson: ${_lesson?.text ?? ''}\nApplication exercise: ${question.question}\nChoices: ${question.choices.join(' | ')}';
 
     showDialog(
       context: context,
