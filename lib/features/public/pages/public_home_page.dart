@@ -269,16 +269,13 @@ class PublicHomePage extends StatelessWidget {
   );
 
   Widget _profiles(BuildContext context, AppTexts texts, bool isWide) {
-    final cards = [
-      _profileCard(context, texts, true),
-      _profileCard(context, texts, false),
-    ];
+    final isFrench = locale.languageCode == 'fr';
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
         children: [
           Text(
-            texts.chooseProfile,
+            isFrench ? 'Accéder à Fise School' : 'Access Fise School',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 27,
@@ -288,105 +285,81 @@ class PublicHomePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            isWide
-                ? 'Choisissez votre parcours pour accéder à votre espace.'
-                : 'Choisissez votre parcours.',
+            isFrench
+                ? 'Connectez-vous à votre compte ou créez-en un nouveau.'
+                : 'Log in to your account or create a new one.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           isWide
               ? Row(
                   children: [
-                    Expanded(child: cards[0]),
-                    const SizedBox(width: 18),
-                    Expanded(child: cards[1]),
+                    Expanded(
+                      child: _authButton(
+                        context,
+                        label: isFrench ? 'Connexion' : 'Log in',
+                        icon: Icons.login_rounded,
+                        register: false,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _authButton(
+                        context,
+                        label: isFrench ? 'Inscription' : 'Sign up',
+                        icon: Icons.person_add_alt_1_rounded,
+                        register: true,
+                      ),
+                    ),
                   ],
                 )
               : Column(
-                  children: [cards[0], const SizedBox(height: 16), cards[1]],
+                  children: [
+                    _authButton(
+                      context,
+                      label: isFrench ? 'Connexion' : 'Log in',
+                      icon: Icons.login_rounded,
+                      register: false,
+                    ),
+                    const SizedBox(height: 12),
+                    _authButton(
+                      context,
+                      label: isFrench ? 'Inscription' : 'Sign up',
+                      icon: Icons.person_add_alt_1_rounded,
+                      register: true,
+                    ),
+                  ],
                 ),
         ],
       ),
     );
   }
 
-  Widget _profileCard(BuildContext context, AppTexts texts, bool isStudent) {
-    final title = isStudent ? texts.student : texts.teacher;
-    final description = isStudent
-        ? texts.studentDescription
-        : texts.teacherDescription;
-    final routeDescription = isStudent
-        ? 'Accéder à l’espace étudiant'
-        : 'Accéder à l’espace enseignant';
-
-    return Semantics(
-      label: routeDescription,
-      child: Ink(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFDCEBE0)),
+  Widget _authButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required bool register,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: register
+              ? const Color(0xFF166534)
+              : const Color(0xFF14532D),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EC),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(
-                isStudent ? Icons.school_rounded : Icons.co_present_rounded,
-                color: const Color(0xFF166534),
-                size: 30,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF123524),
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Text(
-                        texts.continueText,
-                        style: const TextStyle(
-                          color: Color(0xFF166534),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Color(0xFF166534),
-                        size: 19,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+        onPressed: () => _openAuth(context, register: register),
+        icon: Icon(icon),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
       ),
     );
