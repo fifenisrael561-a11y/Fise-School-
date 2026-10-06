@@ -59,6 +59,9 @@ async function findStudentCourseContext(
   question: string,
   language: string,
 ) {
+  const terms = searchTerms(question);
+  if (!terms.length) return { found: false, context: "" };
+
   const { data: memberships, error: membershipError } = await admin
     .from("class_students")
     .select("class_id")
@@ -81,9 +84,6 @@ async function findStudentCourseContext(
     .limit(120);
 
   if (chunkError) throw chunkError;
-
-  const terms = searchTerms(question);
-  if (!terms.length) return { found: false, context: "" };
 
   const scored = (chunks ?? [])
     .map((row: any) => {
@@ -239,8 +239,8 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     if (message) currentParts.push({ text: message });
     contents.push({ role: "user", parts: currentParts });
 
-    const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
-    const models = [...new Set([configuredModel, "gemini-2.5-flash", "gemini-3.7-flash"])];
+    const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash-lite";
+    const models = [...new Set([configuredModel, "gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash"])];
     let data: any = null;
     let lastError = "Gemini request failed.";
     for (const model of models) {
@@ -258,7 +258,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: schoolContext }] },
               contents,
-              generationConfig: { maxOutputTokens: 2048 },
+              generationConfig: { maxOutputTokens: 1536 },
             }),
             signal: controller.signal,
           },
