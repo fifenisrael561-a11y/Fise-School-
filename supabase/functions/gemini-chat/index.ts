@@ -29,9 +29,9 @@ function normalizeSearchText(value: string) {
   return value
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
-    .replace(/[^a-z0-9\\s]/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -112,9 +112,9 @@ async function findStudentCourseContext(
         `[Cours ${index + 1}]`,
         `Titre: ${item.title}`,
         `Contenu: ${clipped}`,
-      ].join("\\n");
+      ].join("\n");
     })
-    .join("\\n\\n");
+    .join("\n\n");
 
   return { found: true, context };
 }
@@ -240,12 +240,12 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     contents.push({ role: "user", parts: currentParts });
 
     const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
-    const models = [...new Set([configuredModel, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"])];
+    const models = [...new Set([configuredModel, "gemini-2.5-flash", "gemini-3.7-flash"])];
     let data: any = null;
     let lastError = "Gemini request failed.";
     for (const model of models) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
+      const timeout = setTimeout(() => controller.abort(), 12000);
       try {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -268,7 +268,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
         lastError = data?.error?.message ?? `Gemini request failed on ${model}.`;
         if (![404, 429, 500, 502, 503, 504].includes(response.status)) break;
       } catch (error) {
-        lastError = error instanceof Error ? error.message : "Gemini request failed.";
+        lastError = error instanceof DOMException && error.name === "AbortError" ? `Gemini request timed out on ${model}.` : (error instanceof Error ? error.message : "Gemini request failed.");
       } finally {
         clearTimeout(timeout);
       }
