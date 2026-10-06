@@ -77,7 +77,8 @@ async function findStudentCourseContext(
     .in("class_id", classIds)
     .eq("course_resources.index_status", "indexed")
     .eq("course_resources.index_approved", true)
-    .eq("courses.status", "published");
+    .eq("courses.status", "published")
+    .limit(120);
 
   if (chunkError) throw chunkError;
 
@@ -234,6 +235,8 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     contents.push({ role: "user", parts: currentParts });
 
     const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
