@@ -111,8 +111,37 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
+  Future<void> _debugStatement(String sql, [List<Object?> args = const []]) async {
+    try {
+      await customStatement(sql, args);
+    } catch (error, stackTrace) {
+      print('[FISE-DRIFT] SQL ERROR');
+      print('[FISE-DRIFT] SQL: $sql');
+      print('[FISE-DRIFT] PARAMS: $args');
+      print('[FISE-DRIFT] ERROR: $error');
+      print('[FISE-DRIFT] STACK: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<List<QueryRow>> _debugSelect(
+    String sql, {
+    List<Variable<Object>> variables = const [],
+  }) async {
+    try {
+      return await customSelect(sql, variables: variables);
+    } catch (error, stackTrace) {
+      print('[FISE-DRIFT] SQL SELECT ERROR');
+      print('[FISE-DRIFT] SQL: $sql');
+      print('[FISE-DRIFT] PARAMS: $variables');
+      print('[FISE-DRIFT] ERROR: $error');
+      print('[FISE-DRIFT] STACK: $stackTrace');
+      rethrow;
+    }
+  }
+
   Future<void> _createDownloadedFilesTable() async {
-    await customStatement('''
+    await _debugStatement('''
       CREATE TABLE IF NOT EXISTS downloaded_files (
         resource_id TEXT PRIMARY KEY NOT NULL,
         course_id TEXT NOT NULL,
@@ -128,10 +157,10 @@ class AppDatabase extends _$AppDatabase {
           CHECK (status IN ('queued','downloading','done','failed'))
       )
     ''');
-    await customStatement(
+    await _debugStatement(
       'CREATE INDEX IF NOT EXISTS downloaded_files_course_idx ON downloaded_files(course_id, user_id)',
     );
-    await customStatement(
+    await _debugStatement(
       'CREATE INDEX IF NOT EXISTS downloaded_files_status_idx ON downloaded_files(user_id, status)',
     );
   }
@@ -139,62 +168,62 @@ class AppDatabase extends _$AppDatabase {
   Future<List<DownloadedFileRecord>> getDownloadedFiles({String? userId, String? courseId}) async {
     final where = <String>[];
     final variables = <Variable<Object>>[];
-    if (userId != null) { where.add('user_id = ?'); variables.add(Variable<Object>(userId)); }
-    if (courseId != null) { where.add('course_id = ?'); variables.add(Variable<Object>(courseId)); }
-    final rows = await customSelect(
+    if (userId != null) { where.add('user_id = ?'); variables.add(Variable.withString(userId) as Variable<Object>); }
+    if (courseId != null) { where.add('course_id = ?'); variables.add(Variable.withString(courseId) as Variable<Object>); }
+    final rows = await _debugSelect(
       'SELECT * FROM downloaded_files${where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}'} ORDER BY COALESCE(last_opened_at, downloaded_at) ASC',
       variables: variables,
-    ).get();
+    );
     return rows.map(DownloadedFileRecord.fromRow).toList(growable: false);
   }
 
   Future<DownloadedFileRecord?> getDownloadedFile(String resourceId, String userId) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT * FROM downloaded_files WHERE resource_id = ? AND user_id = ? LIMIT 1',
-      variables: [Variable<Object>(resourceId), Variable<Object>(userId)],
-    ).get();
+      variables: [Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>],
+    );
     return rows.isEmpty ? null : DownloadedFileRecord.fromRow(rows.first);
   }
 
   Future<void> upsertDownloadedFile(DownloadedFileRecord file) async {
-    await customStatement(
+    await _debugStatement(
       '''INSERT INTO downloaded_files(resource_id,course_id,user_id,file_name,mime_type,local_path,size_bytes,remote_updated_at,downloaded_at,last_opened_at,status)
       VALUES(?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(resource_id) DO UPDATE SET course_id=excluded.course_id,user_id=excluded.user_id,file_name=excluded.file_name,mime_type=excluded.mime_type,local_path=excluded.local_path,size_bytes=excluded.size_bytes,remote_updated_at=excluded.remote_updated_at,downloaded_at=excluded.downloaded_at,last_opened_at=excluded.last_opened_at,status=excluded.status''',
-      [Variable(file.resourceId), Variable(file.courseId), Variable(file.userId), Variable(file.fileName), Variable(file.mimeType ?? ''), Variable(file.localPath), Variable(file.sizeBytes), Variable(file.remoteUpdatedAt?.toIso8601String() ?? ''), Variable(file.downloadedAt?.toIso8601String() ?? ''), Variable(file.lastOpenedAt?.toIso8601String() ?? ''), Variable(file.status)],
+      [file.resourceId, file.courseId, file.userId, file.fileName, file.mimeType ?? '', file.localPath, file.sizeBytes, Variable(file.remoteUpdatedAt?.toIso8601String() ?? ''), Variable(file.downloadedAt?.toIso8601String() ?? ''), Variable(file.lastOpenedAt?.toIso8601String() ?? ''), file.status],
     );
   }
 
   Future<void> updateDownloadedFileStatus(String resourceId, String userId, String status) async {
-    await customStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?', [Variable<Object>(status), Variable<Object>(resourceId), Variable<Object>(userId)]);
+    await _debugStatement('UPDATE downloaded_files SET status = ? WHERE resource_id = ? AND user_id = ?', [Variable.withString(status) as Variable<Object>, Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
   }
 
   Future<void> markDownloadedFileOpened(String resourceId, String userId) async {
-    await customStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [Variable(DateTime.now().toIso8601String()), Variable(resourceId), Variable(userId)]);
+    await _debugStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [Variable(DateTime.now().toIso8601String()), resourceId, userId]);
   }
 
   Future<void> deleteDownloadedFile(String resourceId, String userId) async {
-    await customStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?', [Variable<Object>(resourceId), Variable<Object>(userId)]);
+    await _debugStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?', [Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
   }
 
   Future<void> deleteAllDownloadedFiles(String userId) async {
-    await customStatement('DELETE FROM downloaded_files WHERE user_id = ?', [Variable<Object>(userId)]);
+    await _debugStatement('DELETE FROM downloaded_files WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
   }
 
   Future<int> downloadedFilesSize(String userId) async {
-    final rows = await customSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [Variable<Object>(userId)]).get();
+    final rows = await _debugSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [Variable.withString(userId) as Variable<Object>]);
     return rows.first.read<int>('total');
   }
 
   Future<void> _createOfflineIdentityTables() async {
-    await customStatement('''
+    await _debugStatement('''
       CREATE TABLE IF NOT EXISTS cached_profiles (
         user_id TEXT PRIMARY KEY NOT NULL,
         data_json TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
     ''');
-    await customStatement('''
+    await _debugStatement('''
       CREATE TABLE IF NOT EXISTS cached_class_subjects (
         cache_key TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -202,54 +231,54 @@ class AppDatabase extends _$AppDatabase {
         updated_at TEXT NOT NULL
       )
     ''');
-    await customStatement(
+    await _debugStatement(
       'CREATE INDEX IF NOT EXISTS cached_class_subjects_user_idx ON cached_class_subjects(user_id, updated_at DESC)',
     );
   }
 
   Future<void> saveCachedProfile(String userId, String dataJson) async {
-    await customStatement(
+    await _debugStatement(
       'INSERT INTO cached_profiles(user_id,data_json,updated_at) VALUES(?,?,?) '
       'ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
-      [Variable(userId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+      [userId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
   Future<String?> getCachedProfile(String userId) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT data_json FROM cached_profiles WHERE user_id = ? LIMIT 1',
-      variables: [Variable<Object>(userId)],
-    ).get();
+      variables: [Variable.withString(userId) as Variable<Object>],
+    );
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
 
   Future<void> deleteCachedProfile(String userId) async {
-    await customStatement('DELETE FROM cached_profiles WHERE user_id = ?', [Variable<Object>(userId)]);
+    await _debugStatement('DELETE FROM cached_profiles WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
   }
 
   Future<void> saveCachedClassSubjects(String userId, String dataJson) async {
-    await customStatement(
+    await _debugStatement(
       'INSERT INTO cached_class_subjects(cache_key,user_id,data_json,updated_at) VALUES(?,?,?,?) '
       'ON CONFLICT(cache_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
-      [Variable(userId), Variable(userId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+      [userId, userId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
   Future<String?> getCachedClassSubjects(String userId) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT data_json FROM cached_class_subjects WHERE user_id = ? LIMIT 1',
-      variables: [Variable<Object>(userId)],
-    ).get();
+      variables: [Variable.withString(userId) as Variable<Object>],
+    );
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
 
   Future<void> deleteCachedIdentity(String userId) async {
     await deleteCachedProfile(userId);
-    await customStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [Variable<Object>(userId)]);
+    await _debugStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
   }
 
   Future<void> _createSmartLearningTables() async {
-    await customStatement("""
+    await _debugStatement("""
       CREATE TABLE IF NOT EXISTS smart_lessons_cache (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -257,7 +286,7 @@ class AppDatabase extends _$AppDatabase {
         cached_at TEXT NOT NULL
       )
     """);
-    await customStatement("""
+    await _debugStatement("""
       CREATE TABLE IF NOT EXISTS smart_exercise_queue (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -266,7 +295,7 @@ class AppDatabase extends _$AppDatabase {
         queued_at TEXT NOT NULL
       )
     """);
-    await customStatement("""
+    await _debugStatement("""
       CREATE TABLE IF NOT EXISTS smart_exercise_results (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -275,117 +304,117 @@ class AppDatabase extends _$AppDatabase {
         saved_at TEXT NOT NULL
       )
     """);
-    await customStatement(
+    await _debugStatement(
       'CREATE INDEX IF NOT EXISTS smart_lessons_user_idx ON smart_lessons_cache(user_id, cached_at DESC)',
     );
-    await customStatement(
+    await _debugStatement(
       'CREATE INDEX IF NOT EXISTS smart_queue_user_idx ON smart_exercise_queue(user_id, queued_at)',
     );
   }
 
   Future<void> _createOfflineQcmTables() async {
-    await customStatement('''
+    await _debugStatement('''
       CREATE TABLE IF NOT EXISTS offline_qcm (
         id TEXT NOT NULL, user_id TEXT NOT NULL, kind TEXT NOT NULL,
         assignment_id TEXT, data_json TEXT NOT NULL, updated_at TEXT NOT NULL,
         PRIMARY KEY (id, user_id, kind)
       )
     ''');
-    await customStatement('''
+    await _debugStatement('''
       CREATE TABLE IF NOT EXISTS offline_qcm_queue (
         id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
         submission_id TEXT NOT NULL, assignment_id TEXT NOT NULL,
         data_json TEXT NOT NULL, queued_at TEXT NOT NULL
       )
     ''');
-    await customStatement('CREATE INDEX IF NOT EXISTS offline_qcm_user_idx ON offline_qcm(user_id, kind, assignment_id)');
-    await customStatement('CREATE INDEX IF NOT EXISTS offline_qcm_queue_user_idx ON offline_qcm_queue(user_id, queued_at)');
+    await _debugStatement('CREATE INDEX IF NOT EXISTS offline_qcm_user_idx ON offline_qcm(user_id, kind, assignment_id)');
+    await _debugStatement('CREATE INDEX IF NOT EXISTS offline_qcm_queue_user_idx ON offline_qcm_queue(user_id, queued_at)');
   }
 
   Future<void> saveOfflineQcm({required String id, required String userId, required String kind, String? assignmentId, required String dataJson}) async {
-    await customStatement(
+    await _debugStatement(
       "INSERT INTO offline_qcm(id,user_id,kind,assignment_id,data_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id,user_id,kind) DO UPDATE SET assignment_id=excluded.assignment_id,data_json=excluded.data_json,updated_at=excluded.updated_at",
-       [Variable(id), Variable(userId), Variable(kind), Variable(assignmentId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+       [id, userId, kind, assignmentId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
   Future<List<QueryRow>> getOfflineQcm(String userId, String kind, {String? assignmentId}) async {
     final filter = assignmentId == null ? '' : ' AND assignment_id = ?';
-    final variables = <Variable<Object>>[Variable<Object>(userId), Variable<Object>(kind)];
+    final variables = <Variable<Object>>[Variable.withString(userId) as Variable<Object>, Variable.withString(kind) as Variable<Object>];
     if (assignmentId != null) {
-      variables.add(Variable<Object>(assignmentId));
+      variables.add(Variable.withString(assignmentId) as Variable<Object>);
     }
-    return customSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', variables: variables).get();
+    return _debugSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', variables: variables);
   }
 
   Future<void> saveOfflineQcmQueue({required String id, required String userId, required String submissionId, required String assignmentId, required String dataJson}) async {
-    await customStatement(
+    await _debugStatement(
       "INSERT OR REPLACE INTO offline_qcm_queue(id,user_id,submission_id,assignment_id,data_json,queued_at) VALUES(?,?,?,?,?,?)",
-       [Variable(id), Variable(userId), Variable(submissionId), Variable(assignmentId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+       [id, userId, submissionId, assignmentId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
-  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => customSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [Variable<Object>(userId)]).get();
+  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => _debugSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [Variable.withString(userId) as Variable<Object>]);
 
-  Future<void> deleteOfflineQcmQueue(String id, String userId) => customStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?', [Variable<Object>(id), Variable<Object>(userId)]);
+  Future<void> deleteOfflineQcmQueue(String id, String userId) => _debugStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?', [Variable.withString(id) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
 
   Future<void> saveSmartLesson({required String userId, required String id, required String dataJson}) async {
-    await customStatement(
+    await _debugStatement(
       'INSERT INTO smart_lessons_cache(id,user_id,data_json,cached_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id,data_json=excluded.data_json,cached_at=excluded.cached_at',
-       [Variable(id), Variable(userId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+       [id, userId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
   Future<QueryRow?> getSmartLesson(String userId, String id) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? AND id = ? LIMIT 1',
-      variables: [Variable<Object>(userId), Variable<Object>(id)],
-    ).get();
+      variables: [Variable.withString(userId) as Variable<Object>, Variable.withString(id) as Variable<Object>],
+    );
     return rows.isEmpty ? null : rows.first;
   }
 
   Future<QueryRow?> latestSmartLesson(String userId) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC LIMIT 1',
-      variables: [Variable<Object>(userId)],
-    ).get();
+      variables: [Variable.withString(userId) as Variable<Object>],
+    );
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<List<QueryRow>> getSmartLessons(String userId) => customSelect(
+  Future<List<QueryRow>> getSmartLessons(String userId) => _debugSelect(
     'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC',
-    variables: [Variable<Object>(userId)],
-  ).get();
+    variables: [Variable.withString(userId) as Variable<Object>],
+  );
 
   Future<void> queueSmartExercise({required String id, required String userId, required String lessonId, required String answersJson}) async {
-    await customStatement(
+    await _debugStatement(
       'INSERT OR REPLACE INTO smart_exercise_queue(id,user_id,lesson_id,answers_json,queued_at) VALUES(?,?,?,?,?)',
-       [Variable(id), Variable(userId), Variable(lessonId), Variable(answersJson), Variable(DateTime.now().toIso8601String())],
+       [id, userId, lessonId, answersJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
-  Future<List<QueryRow>> getSmartExerciseQueue(String userId) => customSelect(
+  Future<List<QueryRow>> getSmartExerciseQueue(String userId) => _debugSelect(
     'SELECT * FROM smart_exercise_queue WHERE user_id = ? ORDER BY queued_at',
-    variables: [Variable<Object>(userId)],
-  ).get();
+    variables: [Variable.withString(userId) as Variable<Object>],
+  );
 
-  Future<void> deleteSmartExerciseQueue(String id, String userId) => customStatement(
+  Future<void> deleteSmartExerciseQueue(String id, String userId) => _debugStatement(
     'DELETE FROM smart_exercise_queue WHERE id = ? AND user_id = ?',
      [id, userId],
   );
 
   Future<void> saveSmartExerciseResult({required String id, required String userId, required String lessonId, required String dataJson}) async {
-    await customStatement(
+    await _debugStatement(
       'INSERT OR REPLACE INTO smart_exercise_results(id,user_id,lesson_id,data_json,saved_at) VALUES(?,?,?,?,?)',
-       [Variable(id), Variable(userId), Variable(lessonId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+       [id, userId, lessonId, dataJson, Variable(DateTime.now().toIso8601String())],
     );
   }
 
   Future<QueryRow?> getSmartExerciseResult(String userId, String lessonId) async {
-    final rows = await customSelect(
+    final rows = await _debugSelect(
       'SELECT * FROM smart_exercise_results WHERE user_id = ? AND lesson_id = ? ORDER BY saved_at DESC LIMIT 1',
-      variables: [Variable<Object>(userId), Variable<Object>(lessonId)],
-    ).get();
+      variables: [Variable.withString(userId) as Variable<Object>, Variable.withString(lessonId) as Variable<Object>],
+    );
     return rows.isEmpty ? null : rows.first;
   }
 
