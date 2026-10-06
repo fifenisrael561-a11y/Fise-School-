@@ -239,7 +239,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     if (message) currentParts.push({ text: message });
     contents.push({ role: "user", parts: currentParts });
 
-    const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
     const models = [...new Set([configuredModel, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"])];
     let data: any = null;
     let lastError = "Gemini request failed.";
