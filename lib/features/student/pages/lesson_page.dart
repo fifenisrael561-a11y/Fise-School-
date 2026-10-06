@@ -5,6 +5,7 @@ import '../../../core/offline/offline_resource_viewer.dart';
 import '../../../core/services/pedagogy_service.dart';
 import '../../../models/pedagogy.dart';
 import '../../../models/user_profile.dart';
+import 'daily_lesson_page.dart';
 
 class LessonPage extends StatefulWidget {
   final Locale locale;
@@ -489,6 +490,69 @@ class _LessonPageState extends State<LessonPage> {
     );
   }
 
+  Widget _buildSmartPracticeCard() {
+    final enabled = widget.course.smartLessonEnabled && isCompleted;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE8F5E9), Color(0xFFF0FDF4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_rounded, color: Color(0xFF166534)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isEnglish ? 'Ready to test what you learned?' : 'Prêt à vérifier ce que tu as appris ?',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            enabled
+                ? (isEnglish
+                    ? 'Fise School will propose an application exercise and smart QCM based on the available learning content.'
+                    : 'Fise School te propose un exercice d’application et un QCM intelligent à partir du contenu pédagogique disponible.')
+                : (isEnglish
+                    ? 'Finish reading the lesson to unlock the practice.'
+                    : 'Termine la lecture de la leçon pour débloquer l’exercice.'),
+            style: const TextStyle(color: Colors.black54, height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: enabled
+                ? () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DailyLessonPage(
+                          locale: widget.locale,
+                          profile: widget.profile,
+                          subjectId: widget.course.subjectId,
+                        ),
+                      ),
+                    )
+                : null,
+            icon: const Icon(Icons.psychology_alt_rounded),
+            label: Text(isEnglish ? 'Start practice' : 'Commencer l’entraînement'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResourcesSection() {
     if (_resources.isEmpty) {
       return Container(
@@ -629,7 +693,9 @@ class _LessonPageState extends State<LessonPage> {
           _buildHeader(),
           const SizedBox(height: 18),
           _buildProgressCard(),
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
+          _buildSmartPracticeCard(),
+          const SizedBox(height: 6),
           if (objectives != null)
             _buildContentSection(
               title: isEnglish ? 'Objectives' : 'Objectifs',
