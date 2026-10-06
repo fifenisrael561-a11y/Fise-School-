@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/user_profile.dart';
+import '../offline/offline_repository.dart';
 
 class ProfileService {
   SupabaseClient get _client => Supabase.instance.client;
@@ -11,13 +12,20 @@ class ProfileService {
       return null;
     }
 
-    final data = await _client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    return data == null ? null : UserProfile.fromMap(data);
+    try {
+      final data = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      final profile = data == null ? null : UserProfile.fromMap(data);
+      if (profile != null) {
+        await OfflineRepository().saveProfileCache(profile);
+      }
+      return profile;
+    } catch (_) {
+      return OfflineRepository().getProfileCache(user.id);
+    }
   }
 
   Future<UserProfile> updateEditableProfile({
