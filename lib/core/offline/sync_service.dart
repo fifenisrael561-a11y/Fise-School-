@@ -35,6 +35,7 @@ class SyncService {
     }
     await _offline.saveCourses(courses);
 
+    await syncPendingProgress(studentId);
     await syncPendingAssignments(studentId);
     await syncPendingSmartExercises(studentId);
 
@@ -74,6 +75,27 @@ class SyncService {
     final Lesson lesson = await lessonService.getLesson(lessonId);
 
     await _offline.saveLesson(lesson);
+  }
+
+  Future<void> syncPendingProgress(String studentId) async {
+    final localRows = await _offline.getProgress();
+    for (final item in localRows.where((row) => row.userId == studentId)) {
+      final lessonId = item.lessonId;
+      if (lessonId == null || lessonId.isEmpty) continue;
+      try {
+        await _client.from('lesson_progress').upsert({
+          'student_id': studentId,
+          'lesson_id': lessonId,
+          'status': item.completed ? 'completed' : 'in_progress',
+          'progress_percent': item.progressPercent,
+          'started_at': item.updatedAt.toIso8601String(),
+          'last_opened_at': item.updatedAt.toIso8601String(),
+          'completed_at': item.completed ? item.updatedAt.toIso8601String() : null,
+        }, onConflict: 'student_id,lesson_id');
+      } catch (_) {
+        // Keep the local progress until a later online synchronization.
+      }
+    }
   }
 
   Future<void> syncPendingSmartExercises(String studentId) async {
