@@ -86,7 +86,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -95,6 +95,7 @@ class AppDatabase extends _$AppDatabase {
           await _createDownloadedFilesTable();
           await _createOfflineQcmTables();
           await _createSmartLearningTables();
+          await _createOfflineIdentityTables();
         },
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
@@ -103,6 +104,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await _createSmartLearningTables();
+          }
+          if (from < 4) {
+            await _createOfflineIdentityTables();
           }
         },
       );
@@ -180,6 +184,68 @@ class AppDatabase extends _$AppDatabase {
   Future<int> downloadedFilesSize(String userId) async {
     final rows = await customSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [Variable(userId)]).get();
     return rows.first.read<int>('total');
+  }
+
+  Future<void> _createOfflineIdentityTables() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS cached_profiles (
+        user_id TEXT PRIMARY KEY NOT NULL,
+        data_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS cached_class_subjects (
+        cache_key TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        data_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS cached_class_subjects_user_idx ON cached_class_subjects(user_id, updated_at DESC)',
+    );
+  }
+
+  Future<void> saveCachedProfile(String userId, String dataJson) async {
+    await customStatement(
+      'INSERT INTO cached_profiles(user_id,data_json,updated_at) VALUES(?,?,?) '
+      'ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
+      [Variable(userId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+    );
+  }
+
+  Future<String?> getCachedProfile(String userId) async {
+    final rows = await customSelect(
+      'SELECT data_json FROM cached_profiles WHERE user_id = ? LIMIT 1',
+      variables: [Variable(userId)],
+    ).get();
+    return rows.isEmpty ? null : rows.first.read<String>('data_json');
+  }
+
+  Future<void> deleteCachedProfile(String userId) async {
+    await customStatement('DELETE FROM cached_profiles WHERE user_id = ?', [Variable(userId)]);
+  }
+
+  Future<void> saveCachedClassSubjects(String userId, String dataJson) async {
+    await customStatement(
+      'INSERT INTO cached_class_subjects(cache_key,user_id,data_json,updated_at) VALUES(?,?,?,?) '
+      'ON CONFLICT(cache_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at',
+      [Variable(userId), Variable(userId), Variable(dataJson), Variable(DateTime.now().toIso8601String())],
+    );
+  }
+
+  Future<String?> getCachedClassSubjects(String userId) async {
+    final rows = await customSelect(
+      'SELECT data_json FROM cached_class_subjects WHERE user_id = ? LIMIT 1',
+      variables: [Variable(userId)],
+    ).get();
+    return rows.isEmpty ? null : rows.first.read<String>('data_json');
+  }
+
+  Future<void> deleteCachedIdentity(String userId) async {
+    await deleteCachedProfile(userId);
+    await customStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [Variable(userId)]);
   }
 
   Future<void> _createSmartLearningTables() async {
