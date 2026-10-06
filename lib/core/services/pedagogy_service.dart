@@ -475,25 +475,40 @@ class ProgressService {
     required String lessonId,
   }) async {
     final existing = await get(studentId, lessonId);
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now();
+    final progress = LessonProgress(
+      id: existing?.id ?? '$studentId:$lessonId',
+      studentId: studentId,
+      lessonId: lessonId,
+      status: existing?.status == 'completed' ? 'completed' : 'in_progress',
+      progressPercent: existing?.progressPercent ?? 0,
+      startedAt: existing?.startedAt ?? now,
+      completedAt: existing?.completedAt,
+      lastOpenedAt: now,
+      updatedAt: now,
+    );
 
-    final values = <String, dynamic>{
-      'student_id': studentId,
-      'lesson_id': lessonId,
-      'status': existing?.status == 'completed' ? 'completed' : 'in_progress',
-      'progress_percent': existing?.progressPercent ?? 0,
-      'started_at': existing?.startedAt?.toIso8601String() ?? now,
-      'last_opened_at': now,
-      'completed_at': existing?.completedAt?.toIso8601String(),
-    };
-
-    final row = await _client
-        .from('lesson_progress')
-        .upsert(values, onConflict: 'student_id,lesson_id')
-        .select()
-        .single();
-
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .upsert({
+            'student_id': studentId,
+            'lesson_id': lessonId,
+            'status': progress.status,
+            'progress_percent': progress.progressPercent,
+            'started_at': progress.startedAt?.toIso8601String(),
+            'last_opened_at': now.toIso8601String(),
+            'completed_at': progress.completedAt?.toIso8601String(),
+          }, onConflict: 'student_id,lesson_id')
+          .select()
+          .single();
+      final remote = LessonProgress.fromMap(Map<String, dynamic>.from(row));
+      await OfflineRepository().saveProgress(progress: remote);
+      return remote;
+    } catch (_) {
+      await OfflineRepository().saveProgress(progress: progress);
+      return progress;
+    }
   }
 
   Future<LessonProgress> complete({
@@ -501,26 +516,42 @@ class ProgressService {
     required String lessonId,
   }) async {
     final existing = await get(studentId, lessonId);
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now();
+    final progress = LessonProgress(
+      id: existing?.id ?? '$studentId:$lessonId',
+      studentId: studentId,
+      lessonId: lessonId,
+      status: 'completed',
+      progressPercent: 100,
+      startedAt: existing?.startedAt ?? now,
+      completedAt: now,
+      lastOpenedAt: now,
+      updatedAt: now,
+    );
 
-    final values = <String, dynamic>{
-      'student_id': studentId,
-      'lesson_id': lessonId,
-      'status': 'completed',
-      'progress_percent': 100,
-      'started_at': existing?.startedAt?.toIso8601String() ?? now,
-      'last_opened_at': now,
-      'completed_at': now,
-    };
-
-    final row = await _client
-        .from('lesson_progress')
-        .upsert(values, onConflict: 'student_id,lesson_id')
-        .select()
-        .single();
-
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .upsert({
+            'student_id': studentId,
+            'lesson_id': lessonId,
+            'status': 'completed',
+            'progress_percent': 100,
+            'started_at': progress.startedAt?.toIso8601String(),
+            'last_opened_at': now.toIso8601String(),
+            'completed_at': now.toIso8601String(),
+          }, onConflict: 'student_id,lesson_id')
+          .select()
+          .single();
+      final remote = LessonProgress.fromMap(Map<String, dynamic>.from(row));
+      await OfflineRepository().saveProgress(progress: remote);
+      return remote;
+    } catch (_) {
+      await OfflineRepository().saveProgress(progress: progress);
+      return progress;
+    }
   }
+
 }
 
 class ResourceService {
