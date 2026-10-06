@@ -233,24 +233,7 @@ class PublicHomePage extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: 220,
-            height: 50,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF166534),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: () => _openAuth(context),
-              child: Text(
-                isFrench ? 'Inscription / Connexion' : 'Sign up / Log in',
-              ),
-            ),
-          ),
+
         ],
       ),
     );
