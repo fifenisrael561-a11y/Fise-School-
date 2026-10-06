@@ -166,7 +166,7 @@ class _AuthPageState extends State<AuthPage> {
       // AuthGate affiche le tableau de bord dès que la session existe : on
       // revient donc à la racine (auparavant la page d'inscription restait ouverte).
       if (!_isRegistering || signedIn) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pop();
       } else {
         // Inscription réussie mais confirmation e-mail requise : on passe au
         // formulaire de connexion au lieu de laisser le formulaire d'inscription.
