@@ -16,11 +16,14 @@ class ProfileService {
           .select()
           .eq('id', user.id)
           .maybeSingle();
-      final profile = data == null ? null : UserProfile.fromMap(data);
-      if (profile != null) {
+
+      if (data != null) {
+        final profile = UserProfile.fromMap(data);
         await OfflineRepository().saveProfileCache(profile);
+        return profile;
       }
-      return profile;
+
+      return OfflineRepository().getProfileCache(user.id);
     } catch (_) {
       return OfflineRepository().getProfileCache(user.id);
     }
@@ -32,7 +35,10 @@ class ProfileService {
     required String preferredLanguage,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw const AuthException('No active user session.');
+    if (user == null) {
+      throw const AuthException('Aucune session utilisateur active.');
+    }
+
     final data = await _client
         .from('profiles')
         .update({
@@ -43,7 +49,10 @@ class ProfileService {
         .eq('id', user.id)
         .select()
         .single();
-    return UserProfile.fromMap(data);
+
+    final profile = UserProfile.fromMap(data);
+    await OfflineRepository().saveProfileCache(profile);
+    return profile;
   }
 
   Future<UserProfile> saveCurrentProfile({
