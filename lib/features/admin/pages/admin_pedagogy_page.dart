@@ -80,11 +80,10 @@ class AdminPedagogyPage extends StatelessWidget {
                 ? 'Choisir exactement les salles qui doivent recevoir un contenu.'
                 : 'Choose exactly which classrooms should receive content.',
             onTap: () {
-              _showComingSoon(
-                context,
-                _isFrench
-                    ? 'Diffusion dans les salles'
-                    : 'Classroom publishing',
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AdminCoursesPage(locale: locale),
+                ),
               );
             },
           ),
