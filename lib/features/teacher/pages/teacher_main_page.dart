@@ -9,6 +9,7 @@ import 'teacher_courses_page.dart';
 import 'qcm_builder_page.dart';
 import 'teacher_timetable_page.dart';
 import 'grades_entry_page.dart';
+import 'teacher_access_code_page.dart';
 import '../../messages/pages/messages_hub_page.dart';
 
 class TeacherMainPage extends StatefulWidget {
@@ -65,7 +66,8 @@ class _TeacherHome extends StatelessWidget {
         _TeacherAction(icon: Icons.grading_rounded, title: fr ? 'Notes' : 'Marks', subtitle: fr ? 'Saisir les notes de vos élèves par matière et par période.' : 'Enter your students\' marks by subject and period.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GradesEntryPage(locale: locale, profile: profile)))),
         _TeacherAction(icon: Icons.forum_rounded, title: fr ? 'Forums' : 'Forums', subtitle: fr ? 'Chaque forum est rattaché à une salle.' : 'Every forum belongs to a classroom.', onTap: onForums),
         _TeacherAction(icon: Icons.calendar_month_rounded, title: fr ? 'Emploi du temps' : 'Timetable', subtitle: fr ? 'Consultez vos créneaux de cours.' : 'View your teaching schedule.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherTimetablePage(locale: locale, profile: profile)))),
-        _TeacherAction(icon: Icons.chat_bubble_outline, title: fr ? 'Messages' : 'Messages', subtitle: fr ? 'Échanger avec les élèves de vos salles.' : 'Chat with students in your classrooms.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesHubPage(locale: locale, profile: profile)))),
+        _TeacherAction(icon: Icons.key_rounded, title: fr ? 'Code forum + messagerie' : 'Forum + messaging code', subtitle: fr ? 'Créez votre code unique par salle et contrôlez qui rejoint votre espace.' : 'Create your unique classroom code and control who joins your space.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherAccessCodePage(locale: locale, profile: profile)))),
+        _TeacherAction(icon: Icons.chat_bubble_outline, title: fr ? 'Messages' : 'Messages', subtitle: fr ? 'Échanger avec les élèves qui ont rejoint votre espace.' : 'Chat with students who joined your space.', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesHubPage(locale: locale, profile: profile)))),
       ]),
     );
   }
