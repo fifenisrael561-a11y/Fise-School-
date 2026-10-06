@@ -119,7 +119,7 @@ class TeacherAccessCodeService {
     if (existing == null) {
       final now = DateTime.now();
       final newCode = TeacherAccessCode(
-        id: teacherId + '_' + classId + '_' + now.millisecondsSinceEpoch.toString(),
+        id: '${teacherId}_${classId}_${now.millisecondsSinceEpoch}',
         teacherId: teacherId,
         code: cleanCode,
         classId: classId,
