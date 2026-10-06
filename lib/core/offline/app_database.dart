@@ -199,7 +199,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> markDownloadedFileOpened(String resourceId, String userId) async {
-    await _debugStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [DateTime.now().toIso8601String()), resourceId, userId]);
+    await _debugStatement("UPDATE downloaded_files SET last_opened_at = ?, status = 'done' WHERE resource_id = ? AND user_id = ?",  [DateTime.now().toIso8601String(), resourceId, userId]);
   }
 
   Future<void> deleteDownloadedFile(String resourceId, String userId) async {
