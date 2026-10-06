@@ -12,7 +12,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final response = await _client.auth.signInWithPassword(
+    await _client.auth.signInWithPassword(
       email: email.trim().toLowerCase(),
       password: password,
     );
