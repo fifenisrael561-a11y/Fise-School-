@@ -89,6 +89,63 @@ class TeacherAccessCodeService {
     return TeacherAccessCode.fromMap(response);
   }
 
+  /// L'élève rejoint l'espace forum + messagerie privée d'un enseignant.
+  Future<Map<String, String>> joinTeacherSpace(String code) async {
+    final response = await _client.rpc(
+      'join_teacher_access_code',
+      params: {'p_code': code.trim()},
+    );
+    if (response is! List || response.isEmpty) {
+      throw StateError('Invalid teacher access code');
+    }
+    final row = Map<String, dynamic>.from(response.first as Map);
+    return {
+      'teacherId': String(row['teacher_id']),
+      'classId': String(row['class_id']),
+      'accessCodeId': String(row['access_code_id']),
+    };
+  }
+
+  /// Crée le code choisi librement par l'enseignant, ou le remplace.
+  Future<TeacherAccessCode> createOrUpdateCustomCode({
+    required String teacherId,
+    required String classId,
+    required String code,
+  }) async {
+    final cleanCode = _normalizeCode(code);
+    _validateCode(cleanCode);
+
+    final existing = await getAccessCodeForClass(teacherId, classId);
+    if (existing == null) {
+      final now = DateTime.now();
+      final newCode = TeacherAccessCode(
+        id: teacherId + '_' + classId + '_' + now.millisecondsSinceEpoch.toString(),
+        teacherId: teacherId,
+        code: cleanCode,
+        classId: classId,
+        createdAt: now,
+        isActive: true,
+      );
+      final response = await _client
+          .from('teacher_access_codes')
+          .insert(newCode.toMap())
+          .select()
+          .single();
+      return TeacherAccessCode.fromMap(response);
+    }
+
+    final response = await _client
+        .from('teacher_access_codes')
+        .update({
+          'code': cleanCode,
+          'updated_at': DateTime.now().toIso8601String(),
+          'is_active': true,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+    return TeacherAccessCode.fromMap(response);
+  }
   /// Valide un code d'accès
   Future<bool> validateAccessCode(
     String code,
