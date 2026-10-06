@@ -154,7 +154,7 @@ serve(async (req) => {
     // Verify the actual Supabase access token. Merely checking for a Bearer
     // header is not authentication.
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
@@ -198,7 +198,7 @@ serve(async (req) => {
 
     const courseSearch = await findStudentCourseContext(
       createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: \`Bearer \${accessToken}\` } },
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
         auth: { persistSession: false, autoRefreshToken: false },
       }),
       userData.user.id,
