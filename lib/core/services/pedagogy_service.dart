@@ -440,18 +440,34 @@ class ProgressService {
     : _client = client ?? Supabase.instance.client;
 
   Future<LessonProgress?> get(String studentId, String lessonId) async {
-    final row = await _client
-        .from('lesson_progress')
-        .select()
-        .eq('student_id', studentId)
-        .eq('lesson_id', lessonId)
-        .maybeSingle();
+    try {
+      final row = await _client
+          .from('lesson_progress')
+          .select()
+          .eq('student_id', studentId)
+          .eq('lesson_id', lessonId)
+          .maybeSingle();
 
-    if (row == null) {
-      return null;
+      if (row == null) return null;
+
+      final progress = LessonProgress.fromMap(Map<String, dynamic>.from(row));
+      await OfflineRepository().saveProgress(progress: progress);
+      return progress;
+    } catch (_) {
+      final local = await OfflineRepository().getLocalProgress('$studentId:$lessonId');
+      if (local == null) return null;
+      return LessonProgress(
+        id: local.id,
+        studentId: local.userId,
+        lessonId: local.lessonId ?? lessonId,
+        status: local.completed ? 'completed' : 'in_progress',
+        progressPercent: local.progressPercent,
+        updatedAt: local.updatedAt,
+        completedAt: local.completed ? local.updatedAt : null,
+        startedAt: local.updatedAt,
+        lastOpenedAt: local.updatedAt,
+      );
     }
-
-    return LessonProgress.fromMap(Map<String, dynamic>.from(row));
   }
 
   Future<LessonProgress> open({
