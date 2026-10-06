@@ -137,12 +137,12 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
     bool published = true;
     bool saving = false;
 
-    List<Map<String, dynamic>> get selectedClasses => classes
+    List<Map<String, dynamic>> selectedClasses() => classes
         .where((c) => selectedClassIds.contains(c['id'].toString()))
         .toList(growable: false);
 
     Future<void> loadSubjects(StateSetter setDialog) async {
-      final targets = selectedClasses;
+      final targets = selectedClasses();
       subjects = [];
       selectedSubject = null;
       curricula = [];
@@ -303,7 +303,7 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                       }).toList(),
                     ),
                     const SizedBox(height: 14),
-                    if (selectedClasses.length > 1)
+                    if (selectedClasses().length > 1)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Text(
@@ -479,7 +479,7 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                     const SizedBox(height: 8),
                     FilledButton.icon(
                       onPressed: saving ||
-                              selectedClasses.isEmpty ||
+                              selectedClasses().isEmpty ||
                               selectedSubject == null ||
                               selectedCurriculum == null ||
                               selectedChapter == null ||
@@ -490,7 +490,7 @@ class _AdminCoursesPageState extends State<AdminCoursesPage> {
                               setDialog(() => saving = true);
                               try {
                                 var created = 0;
-                                for (final target in selectedClasses) {
+                                for (final target in selectedClasses()) {
                                   await _courses.saveCourse(
                                     curriculumId:
                                         selectedCurriculum!['id'].toString(),
