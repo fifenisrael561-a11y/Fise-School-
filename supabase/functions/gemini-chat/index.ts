@@ -143,7 +143,7 @@ serve(async (req) => {
 
     const accessToken = authHeader.slice("Bearer ".length).trim();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? (() => {\n      try { return JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}").default ?? ""; } catch { return ""; }\n    })();
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const apiKey = Deno.env.get("GEMINI_API_KEY");
 
     if (!supabaseUrl || !supabaseAnonKey) {
