@@ -23,9 +23,15 @@ class ProfileService {
         return profile;
       }
 
-      return OfflineRepository().getProfileCache(user.id);
+      final created = await _createMissingProfile(user);
+      if (created != null) {
+        await OfflineRepository().saveProfileCache(created);
+        return created;
+      }
+
+      return await OfflineRepository().getProfileCache(user.id);
     } catch (_) {
-      return OfflineRepository().getProfileCache(user.id);
+      return await OfflineRepository().getProfileCache(user.id);
     }
   }
 
