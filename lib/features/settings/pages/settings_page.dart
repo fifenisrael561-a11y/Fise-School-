@@ -99,9 +99,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ? 'Fermer la session Fise School sur cet appareil'
                     : 'Sign out of Fise School on this device',
                 onTap: () async {
-                  await PushService.unregister();
-                  await CourseOfflineService().deleteUserFiles(profile.id);
-                  await Supabase.instance.client.auth.signOut();
+                  await SupabaseSessionService().signOut();
                   if (context.mounted) {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }
