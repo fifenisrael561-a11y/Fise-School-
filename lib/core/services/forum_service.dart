@@ -14,19 +14,19 @@ class ForumService {
   Future<List<ForumClass>> listClasses(UserProfile profile) async {
     if (profile.role == 'student') {
       final rows = await _client
-          .from('class_students')
+          .from('teacher_access_memberships')
           .select('class_id, school_classes(id, name, display_name)')
-          .eq('student_id', profile.id)
-          .eq('is_active', true);
+          .eq('student_id', profile.id);
 
+      final seen = <String>{};
       return rows
           .map((row) {
             final data = Map<String, dynamic>.from(
               row['school_classes'] as Map,
             );
-
             return ForumClass.fromMap(data);
           })
+          .where((room) => seen.add(room.id))
           .toList(growable: false);
     }
 
