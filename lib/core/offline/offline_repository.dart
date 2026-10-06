@@ -13,6 +13,20 @@ class OfflineRepository {
 
   final AppDatabase _database;
 
+  Future<void> saveProfileCache(UserProfile profile) async {
+    await _database.saveCachedProfile(profile.id, jsonEncode(profile.toMap()));
+  }
+
+  Future<UserProfile?> getProfileCache(String userId) async {
+    final json = await _database.getCachedProfile(userId);
+    if (json == null) return null;
+    try {
+      return UserProfile.fromMap(jsonDecode(json) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ============================================================
   // COURSES
   // ============================================================
