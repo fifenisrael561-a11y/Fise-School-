@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/forum_service.dart';
 import '../../../models/forum.dart';
 import '../../../models/user_profile.dart';
+import '../../student/dialogs/access_code_dialog.dart';
 
 class ForumPage extends StatefulWidget {
   final Locale locale;
@@ -224,6 +225,21 @@ class _ForumPageState extends State<ForumPage> {
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
+          if (!_isTeacher)
+            IconButton(
+              tooltip: _isFrench ? 'Code d’un enseignant' : 'Teacher code',
+              icon: const Icon(Icons.vpn_key_outlined),
+              onPressed: () async {
+                await showDialog(
+                  context: context,
+                  builder: (_) => AccessCodeDialog(
+                    locale: widget.locale,
+                    profile: widget.profile,
+                    onSuccess: _loadClasses,
+                  ),
+                );
+              },
+            ),
           if (_isTeacher)
             IconButton(
               tooltip: _isFrench ? 'Mes salles' : 'My classrooms',
