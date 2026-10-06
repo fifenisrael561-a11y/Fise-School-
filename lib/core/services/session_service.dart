@@ -62,31 +62,23 @@ class UnavailableSessionService implements SessionService {
   const UnavailableSessionService();
 
   @override
-  Future<SessionState> load() async {
-    return const SessionState.signedOut();
+  Future<SessionState> load() {
+    final inFlight = _loadInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _loadInternal();
+    _loadInFlight = future;
+    future.whenComplete(() {
+      if (identical(_loadInFlight, future)) {
+        _loadInFlight = null;
+      }
+    });
+    return future;
   }
 
-  @override
-  Stream<SessionState> get changes {
-    return const Stream<SessionState>.empty();
-  }
-
-  @override
-  Future<void> signOut() async {}
-}
-
-class SupabaseSessionService implements SessionService {
-  final ProfileService _profileService;
-
-  SupabaseSessionService({
-    ProfileService? profileService,
-  }) : _profileService =
-            profileService ?? ProfileService();
-
-  SupabaseClient get _client => Supabase.instance.client;
-
-  @override
-  Future<SessionState> load() async {
+  Future<SessionState> _loadInternal() async {
     try {
       final session = await _restoreSession();
 
@@ -102,23 +94,14 @@ class SupabaseSessionService implements SessionService {
         return const SessionState.signedOut();
       }
 
-      try {
-        final refreshed = await _client.auth.refreshSession();
-
-        if (refreshed.session == null &&
-            _client.auth.currentSession == null) {
-          return const SessionState.error(
-            'Votre session a expiré. Veuillez vous reconnecter.',
-          );
-        }
-      } on AuthException catch (error) {
-        final currentSession = _client.auth.currentSession;
-
-        if (currentSession == null) {
-          return SessionState.error(
-            'Votre session a expiré. $error.message',
-          );
-        }
+      // Ne jamais appeler refreshSession() ici. Supabase Flutter gère
+      // automatiquement le renouvellement de session. Appeler refreshSession()
+      // depuis plusieurs chargements concurrents faisait tourner les refresh
+      // tokens et pouvait provoquer des token_revoked juste après la connexion.
+      if (session.isExpired) {
+        return const SessionState.error(
+          'La session est en cours de renouvellement. Veuillez patienter un instant.',
+        );
       }
 
       final profile = await _fetchProfile();
@@ -201,19 +184,31 @@ class SupabaseSessionService implements SessionService {
 
     controller = StreamController<SessionState>(
       onListen: () {
-        subscription =
-            _client.auth.onAuthStateChange.listen(
-          (_) {
-            refresh();
+        subscription = _client.auth.onAuthStateChange.listen(
+          (authState) {
+            // Un TOKEN_REFRESHED ne change pas l'identité courante.
+            // Recharger le profil à chaque renouvellement est inutile et
+            // pouvait multiplier les opérations concurrentes.
+            switch (authState.event) {
+              case AuthChangeEvent.tokenRefreshed:
+                return;
+              case AuthChangeEvent.signedOut:
+              case AuthChangeEvent.signedIn:
+              case AuthChangeEvent.initialSession:
+              case AuthChangeEvent.userUpdated:
+              case AuthChangeEvent.userDeleted:
+              case AuthChangeEvent.passwordRecovery:
+              case AuthChangeEvent.mfaChallengeVerified:
+                refresh();
+            }
           },
           onError: (_) {
             refresh();
           },
         );
 
-        // Émet immédiatement l'état courant. Cela évite qu'un retour depuis
-        // l'écran de connexion reste temporairement sur l'accueil public
-        // lorsque l'événement AuthStateChange a déjà été émis.
+        // État initial immédiat. Un second événement initialSession est
+        // dédoublonné par _loadInFlight.
         refresh();
       },
       onCancel: () async {
