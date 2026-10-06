@@ -187,6 +187,19 @@ class AppTexts {
       isEnglish ? 'Classes taught' : 'Classes enseignées';
   String get subjects => isEnglish ? 'Subjects' : 'Matières';
   String get signOut => isEnglish ? 'Log out' : 'Déconnexion';
+  String get noInternetSession => isEnglish
+      ? 'No internet connection. Your local session could not be restored.'
+      : 'Pas de connexion internet. Votre session locale n’a pas pu être restaurée.';
+  String get sessionExpired => isEnglish
+      ? 'Your session has expired. Please log in again.'
+      : 'Votre session a expiré. Veuillez vous reconnecter.';
+  String get profileNotFound => isEnglish
+      ? 'Your account is connected, but your Fise School profile could not be found.'
+      : 'Votre compte est connecté, mais votre profil Fise School est introuvable.';
+  String get offlineProfileUnavailable => isEnglish
+      ? 'No internet connection and no local profile is available.'
+      : 'Pas de connexion internet et aucun profil local n’est disponible.';
+
   String get profileUnavailable => isEnglish
       ? 'Your profile could not be found.'
       : 'Votre profil est introuvable.';
