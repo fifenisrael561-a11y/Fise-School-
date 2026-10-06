@@ -176,6 +176,21 @@ class _AuthGateState extends State<AuthGate> {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () async {
+                  setState(() {
+                    _state = const SessionState.loading();
+                  });
+                  final state = await widget.sessionService.load();
+                  if (mounted) {
+                    setState(() {
+                      _state = state;
+                    });
+                  }
+                },
+                child: const Text('Réessayer'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () async {
                   await widget.sessionService.signOut();
                 },
                 child: Text(texts.signOut),
