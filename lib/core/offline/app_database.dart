@@ -203,7 +203,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteDownloadedFile(String resourceId, String userId) async {
-    await _debugStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?', [Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>]);
+    await _debugStatement('DELETE FROM downloaded_files WHERE resource_id = ? AND user_id = ?', [resourceId, userId]);
   }
 
   Future<void> deleteAllDownloadedFiles(String userId) async {
@@ -253,7 +253,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteCachedProfile(String userId) async {
-    await _debugStatement('DELETE FROM cached_profiles WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
+    await _debugStatement('DELETE FROM cached_profiles WHERE user_id = ?', [userId]);
   }
 
   Future<void> saveCachedClassSubjects(String userId, String dataJson) async {
@@ -274,7 +274,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteCachedIdentity(String userId) async {
     await deleteCachedProfile(userId);
-    await _debugStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [Variable.withString(userId) as Variable<Object>]);
+    await _debugStatement('DELETE FROM cached_class_subjects WHERE user_id = ?', [userId]);
   }
 
   Future<void> _createSmartLearningTables() async {
