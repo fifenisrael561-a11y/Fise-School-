@@ -129,7 +129,7 @@ class _AuthGateState extends State<AuthGate> {
         return _authenticatedPage(_state, texts);
 
       case SessionStatus.profileMissing:
-        return _messagePage(texts.profileUnavailable, texts);
+        return _messagePage(texts.profileNotFound, texts);
 
       case SessionStatus.error:
         return _messagePage(texts.sessionError, texts, detail: _state.message);
