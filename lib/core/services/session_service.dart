@@ -28,11 +28,9 @@ class SessionState {
     this.message,
   });
 
-  const SessionState.loading()
-      : this._(SessionStatus.loading);
+  const SessionState.loading() : this._(SessionStatus.loading);
 
-  const SessionState.signedOut()
-      : this._(SessionStatus.signedOut);
+  const SessionState.signedOut() : this._(SessionStatus.signedOut);
 
   const SessionState.authenticated(UserProfile profile)
       : this._(
@@ -40,8 +38,7 @@ class SessionState {
           profile: profile,
         );
 
-  const SessionState.profileMissing()
-      : this._(SessionStatus.profileMissing);
+  const SessionState.profileMissing() : this._(SessionStatus.profileMissing);
 
   const SessionState.error(String message)
       : this._(
@@ -60,6 +57,26 @@ abstract interface class SessionService {
 
 class UnavailableSessionService implements SessionService {
   const UnavailableSessionService();
+
+  @override
+  Future<SessionState> load() async => const SessionState.signedOut();
+
+  @override
+  Stream<SessionState> get changes => const Stream<SessionState>.empty();
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class SupabaseSessionService implements SessionService {
+  final ProfileService _profileService;
+  Future<SessionState>? _loadInFlight;
+
+  SupabaseSessionService({
+    ProfileService? profileService,
+  }) : _profileService = profileService ?? ProfileService();
+
+  SupabaseClient get _client => Supabase.instance.client;
 
   @override
   Future<SessionState> load() {
@@ -94,10 +111,10 @@ class UnavailableSessionService implements SessionService {
         return const SessionState.signedOut();
       }
 
-      // Ne jamais appeler refreshSession() ici. Supabase Flutter gère
-      // automatiquement le renouvellement de session. Appeler refreshSession()
-      // depuis plusieurs chargements concurrents faisait tourner les refresh
-      // tokens et pouvait provoquer des token_revoked juste après la connexion.
+      // Supabase Flutter renouvelle automatiquement les sessions.
+      // Il ne faut pas appeler refreshSession() à chaque chargement :
+      // plusieurs refreshs concurrents peuvent faire tourner les refresh
+      // tokens et provoquer des token_revoked juste après la connexion.
       if (session.isExpired) {
         return const SessionState.error(
           'La session est en cours de renouvellement. Veuillez patienter un instant.',
@@ -140,7 +157,7 @@ class UnavailableSessionService implements SessionService {
 
       if (attempt < 5) {
         await Future<void>.delayed(
-          const Duration(milliseconds: 500),
+          const Duration(milliseconds: 300),
         );
       }
     }
@@ -176,8 +193,7 @@ class UnavailableSessionService implements SessionService {
       final currentGeneration = ++generation;
       final state = await load();
 
-      if (currentGeneration == generation &&
-          !controller.isClosed) {
+      if (currentGeneration == generation && !controller.isClosed) {
         controller.add(state);
       }
     }
@@ -187,8 +203,7 @@ class UnavailableSessionService implements SessionService {
         subscription = _client.auth.onAuthStateChange.listen(
           (authState) {
             // Un TOKEN_REFRESHED ne change pas l'identité courante.
-            // Recharger le profil à chaque renouvellement est inutile et
-            // pouvait multiplier les opérations concurrentes.
+            // On évite donc un nouveau chargement du profil à chaque refresh.
             switch (authState.event) {
               case AuthChangeEvent.tokenRefreshed:
                 return;
@@ -207,8 +222,8 @@ class UnavailableSessionService implements SessionService {
           },
         );
 
-        // État initial immédiat. Un second événement initialSession est
-        // dédoublonné par _loadInFlight.
+        // État initial immédiat. Si initialSession arrive aussi, le chargement
+        // est dédoublonné par _loadInFlight.
         refresh();
       },
       onCancel: () async {
@@ -227,8 +242,7 @@ class UnavailableSessionService implements SessionService {
       final userId = _client.auth.currentUser?.id;
 
       if (userId != null) {
-        await CourseOfflineService()
-            .deleteUserFiles(userId);
+        await CourseOfflineService().deleteUserFiles(userId);
         await OfflineRepository().clearIdentity(userId);
       }
 
