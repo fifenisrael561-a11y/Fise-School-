@@ -1,12 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'profile_service.dart';
 import '../offline/offline_repository.dart';
 
 class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
-  final ProfileService _profileService = ProfileService();
 
   Future<void> signIn({
     required String email,
@@ -64,26 +62,8 @@ class AuthService {
       },
     );
 
-    final user = response.user;
-    if (user != null && response.session != null) {
-      await _profileService.saveCurrentProfile(
-        firstName: firstName,
-        lastName: lastName,
-        email: cleanEmail,
-        role: role,
-        subsystem: subsystem,
-        sector: sector,
-        examLevelId: examLevelId,
-        examId: examId,
-        seriesId: seriesId,
-        specialtyId: specialtyId,
-        examLevel: examLevel,
-        exam: exam,
-        track: track,
-        className: className,
-      );
-    }
-
+    // Le trigger Supabase crée le profil dans la même opération que
+    // l'inscription. Aucun upsert client supplémentaire n'est nécessaire.
     return response.session != null;
   }
 
