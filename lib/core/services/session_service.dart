@@ -240,8 +240,10 @@ class SupabaseSessionService implements SessionService {
                 return;
               case AuthChangeEvent.signedOut:
                 refresh();
+                return;
               case AuthChangeEvent.signedIn:
                 refreshAfterSignIn();
+                return;
               case AuthChangeEvent.initialSession:
               case AuthChangeEvent.userUpdated:
               case AuthChangeEvent.userDeleted:
