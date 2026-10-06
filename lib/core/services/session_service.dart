@@ -62,28 +62,26 @@ class SupabaseSessionService implements SessionService {
   @override
   Future<SessionState> load() async {
     try {
-      var session = _client.auth.currentSession;
-
-      // On Android, the persisted session can be present but its access token
-      // may be stale while the Auth client is still restoring/refreshing it.
-      // Refresh once before deciding that the user is signed out.
-      if (session != null) {
-        try {
-          final refreshed = await _client.auth.refreshSession();
-          session = refreshed.session ?? _client.auth.currentSession;
-        } on AuthException {
-          // Keep the existing session if Supabase could not refresh it yet.
-        }
-      }
+      // Supabase may still be restoring the persisted Android session when
+      // AuthGate performs its first load. Never interpret that short window
+      // as a real sign-out, otherwise the app can jump back to the public home.
+      var session = await _restoreSession();
 
       if (session == null) {
         return const SessionState.signedOut();
       }
 
+      // Refresh the restored session when possible, but keep the valid session
+      // if a refresh is temporarily unavailable.
+      try {
+        final refreshed = await _client.auth.refreshSession();
+        session = refreshed.session ?? _client.auth.currentSession ?? session;
+      } on AuthException {
+        session = _client.auth.currentSession ?? session;
+      }
+
       final profile = await _fetchProfile();
       if (profile == null) {
-        // Never sign the user out just because the profile query temporarily
-        // returned no row. The Auth session is still valid.
         return const SessionState.profileMissing();
       }
       return SessionState.authenticated(profile);
@@ -94,22 +92,49 @@ class SupabaseSessionService implements SessionService {
     }
   }
 
+  /// Gives Supabase a short window to finish restoring the persisted session.
+  /// This is especially important on Android, where currentSession can be null
+  /// for a moment during application startup.
+  Future<Session?> _restoreSession() async {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      final session = _client.auth.currentSession;
+      if (session != null) {
+        return session;
+      }
+
+      if (_client.auth.currentUser != null) {
+        final restored = _client.auth.currentSession;
+        if (restored != null) {
+          return restored;
+        }
+      }
+
+      if (attempt < 3) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    }
+    return _client.auth.currentSession;
+  }
+
   /// Le profil est créé par un trigger côté Supabase : juste après une
   /// connexion ou une inscription il peut apparaître avec un léger retard.
-  /// On réessaie donc une fois avant de conclure qu'il est absent.
+  /// On réessaie plusieurs fois avant de conclure qu'il est absent.
   Future<UserProfile?> _fetchProfile() async {
-    var profile = await _profileService.getCurrentProfile();
-    if (profile == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      profile = await _profileService.getCurrentProfile();
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final profile = await _profileService.getCurrentProfile();
+      if (profile != null) {
+        return profile;
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+      }
     }
-    return profile;
+    return null;
   }
 
   /// Chaque événement d'authentification (connexion, déconnexion, jeton
-  /// rafraîchi...) recalcule l'état. Une erreur du flux ne doit jamais le
-  /// couper (sinon l'écran reste figé sur l'accueil après la connexion), et un
-  /// résultat ancien ne doit jamais écraser un résultat plus récent.
+  /// rafraîchi...) recalcule l'état. Un résultat ancien ne doit jamais
+  /// écraser un résultat plus récent.
   @override
   Stream<SessionState> get changes {
     late final StreamController<SessionState> controller;
@@ -141,7 +166,6 @@ class SupabaseSessionService implements SessionService {
   @override
   Future<void> signOut() async {
     await PushService.unregister();
-    // Do not leave another user's downloaded courses on a shared device.
     try {
       final userId = _client.auth.currentUser?.id;
       if (userId != null) {
@@ -151,9 +175,7 @@ class SupabaseSessionService implements SessionService {
       await OfflineRepository().clearCourses();
       await OfflineRepository().clearLessons();
       await OfflineRepository().clearProgress();
-    } catch (_) {
-      // Signing out must still succeed if local cache cleanup fails.
-    }
+    } catch (_) {}
     await _client.auth.signOut();
   }
 }
