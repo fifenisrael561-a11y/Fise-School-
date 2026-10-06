@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../models/pedagogy.dart';
+import '../../models/user_profile.dart';
 import '../../models/assignment.dart';
 import 'app_database.dart';
 
