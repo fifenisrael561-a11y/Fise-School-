@@ -27,6 +27,49 @@ class OfflineRepository {
     }
   }
 
+  Future<void> saveClassSubjectsCache(String userId, List<ClassSubjectEntry> entries) async {
+    final data = entries.map((entry) => {
+      'subject': {
+        'id': entry.subject.id,
+        'name_fr': entry.subject.nameFr,
+        'name_en': entry.subject.nameEn,
+        'code': entry.subject.code,
+        'subsystem': entry.subject.subsystem.name,
+        'sector': entry.subject.sector.name,
+        'description_fr': entry.subject.descriptionFr,
+        'description_en': entry.subject.descriptionEn,
+        'is_active': entry.subject.isActive,
+      },
+      'is_compulsory': entry.isCompulsory,
+      'option_group': entry.optionGroup,
+      'position': entry.position,
+    }).toList(growable: false);
+    await _database.saveCachedClassSubjects(userId, jsonEncode(data));
+  }
+
+  Future<List<ClassSubjectEntry>> getClassSubjectsCache(String userId) async {
+    final json = await _database.getCachedClassSubjects(userId);
+    if (json == null) return const [];
+    try {
+      final rows = jsonDecode(json) as List;
+      return rows.map((row) {
+        final map = Map<String, dynamic>.from(row as Map);
+        return ClassSubjectEntry.fromMap({
+          'subjects': map['subject'],
+          'is_compulsory': map['is_compulsory'],
+          'option_group': map['option_group'],
+          'position': map['position'],
+        });
+      }).toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> clearIdentity(String userId) async {
+    await _database.deleteCachedIdentity(userId);
+  }
+
   // ============================================================
   // COURSES
   // ============================================================
