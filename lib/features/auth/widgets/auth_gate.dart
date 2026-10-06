@@ -33,7 +33,6 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   SessionState _state = const SessionState.loading();
   StreamSubscription<SessionState>? _subscription;
-  int _eventCount = 0;
   StreamSubscription<bool>? _connectivitySubscription;
   String? _syncedStudentId;
 
@@ -41,27 +40,14 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
 
-    _subscription = widget.sessionService.changes.listen((state) {
-      _eventCount++;
-      _updateState(state);
-    });
-    _load();
+    // SessionService émet immédiatement l'état courant.
+    // Un second load() ici créerait une course inutile.
+    _subscription = widget.sessionService.changes.listen(_updateState);
     _connectivitySubscription = ConnectivityService().connectionStream.listen((online) {
       if (online && _state.status == SessionStatus.authenticated) {
         _syncStudentOfflineCache(_state.profile!);
       }
     });
-  }
-
-  Future<void> _load() async {
-    final eventsBefore = _eventCount;
-    final state = await widget.sessionService.load();
-    // Un événement d'authentification plus récent a déjà mis l'état à jour :
-    // on ignore ce résultat ancien pour ne pas revenir à l'accueil.
-    if (_eventCount != eventsBefore) {
-      return;
-    }
-    _updateState(state);
   }
 
   void _updateState(SessionState state) {
