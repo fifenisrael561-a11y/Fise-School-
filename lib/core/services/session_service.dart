@@ -131,6 +131,7 @@ class SupabaseSessionService implements SessionService {
       final userId = _client.auth.currentUser?.id;
       if (userId != null) {
         await CourseOfflineService().deleteUserFiles(userId);
+        await OfflineRepository().clearIdentity(userId);
       }
       await OfflineRepository().clearCourses();
       await OfflineRepository().clearLessons();
