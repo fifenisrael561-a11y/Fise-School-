@@ -177,16 +177,15 @@ class _DailyLessonPageState extends State<DailyLessonPage> {
                 style: const TextStyle(fontSize: 16, height: 1.55),
               ),
               const SizedBox(height: 26),
-              Text(_fr ? 'Exercice' : 'Exercise', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              ...List.generate(
-                lesson.questions.length,
-                (index) => _QuestionCard(
-                  number: index + 1,
-                  question: lesson.questions[index],
-                  selected: _answers[lesson.questions[index].id],
+              if (lesson.questions.isNotEmpty) ...[
+                Text(_fr ? 'Exercice d’application' : 'Application exercise', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                _QuestionCard(
+                  number: 1,
+                  question: lesson.questions.first,
+                  selected: _answers[lesson.questions.first.id],
                   onChanged: (value) => setState(() {
-                    final id = lesson.questions[index].id;
+                    final id = lesson.questions.first.id;
                     if (value == null) {
                       _answers.remove(id);
                     } else {
@@ -195,7 +194,32 @@ class _DailyLessonPageState extends State<DailyLessonPage> {
                   }),
                   french: _fr,
                 ),
-              ),
+              ],
+              if (lesson.questions.length > 1) ...[
+                const SizedBox(height: 12),
+                Text(_fr ? 'QCM pour mieux retenir' : 'QCM to reinforce learning', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                ...List.generate(
+                  lesson.questions.length - 1,
+                  (index) {
+                    final question = lesson.questions[index + 1];
+                    return _QuestionCard(
+                      number: index + 2,
+                      question: question,
+                      selected: _answers[question.id],
+                      onChanged: (value) => setState(() {
+                        final id = question.id;
+                        if (value == null) {
+                          _answers.remove(id);
+                        } else {
+                          _answers[id] = value;
+                        }
+                      }),
+                      french: _fr,
+                    );
+                  },
+                ),
+              ],
               if (_message != null) ...[
                 const SizedBox(height: 12),
                 Container(
