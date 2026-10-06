@@ -10,6 +10,7 @@ import '../../admin/pages/admin_dashboard_page.dart';
 import '../../public/pages/public_home_page.dart';
 import '../../student/pages/student_main_page.dart';
 import '../../../core/services/push_service.dart';
+import '../../../core/services/pedagogy_service.dart';
 import '../../../models/user_profile.dart';
 import '../../teacher/pages/teacher_main_page.dart';
 
@@ -96,6 +97,7 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
       _syncedStudentId = profile.id;
+      await CourseService().listClassSubjects(profile);
       await sync.syncStudentCourses(profile.id);
     } catch (_) {
       // The app remains usable with whatever cache is already available.
