@@ -240,7 +240,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
     contents.push({ role: "user", parts: currentParts });
 
     const configuredModel = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
-    const models = [...new Set([configuredModel, "gemini-3.7-flash", "gemini-3.6-flash"])];
+    const models = [...new Set([configuredModel, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"])];
     let data: any = null;
     let lastError = "Gemini request failed.";
     for (const model of models) {
@@ -266,7 +266,7 @@ Explique clairement et correctement au niveau scolaire de l'utilisateur. Pour un
         data = await response.json();
         if (response.ok) break;
         lastError = data?.error?.message ?? `Gemini request failed on ${model}.`;
-        if (![429, 500, 502, 503, 504].includes(response.status)) break;
+        if (![404, 429, 500, 502, 503, 504].includes(response.status)) break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : "Gemini request failed.";
       } finally {
