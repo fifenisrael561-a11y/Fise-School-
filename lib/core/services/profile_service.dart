@@ -1,16 +1,38 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/user_profile.dart';
+import '../offline/connectivity_service.dart';
 import '../offline/offline_repository.dart';
 
 class ProfileService {
   SupabaseClient get _client => Supabase.instance.client;
 
   Future<UserProfile?> getCurrentProfile() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return null;
+    final session = _client.auth.currentSession;
+    final user = session?.user ?? _client.auth.currentUser;
+    if (session == null || user == null) {
+      return null;
+    }
+
+    final offline = OfflineRepository();
 
     try {
+      // Read through a dedicated authenticated RPC. This prevents a valid
+      // profile from being reported as missing because of a query/RLS error.
+      final rpcData = await _client.rpc('get_my_profile');
+
+      if (rpcData is List && rpcData.isNotEmpty) {
+        final first = rpcData.first;
+        if (first is Map) {
+          final profile = UserProfile.fromMap(
+            Map<String, dynamic>.from(first),
+          );
+          await offline.saveProfileCache(profile);
+          return profile;
+        }
+      }
+
+      // Direct-query fallback keeps compatibility while the migration rolls out.
       final data = await _client
           .from('profiles')
           .select()
@@ -19,69 +41,78 @@ class ProfileService {
 
       if (data != null) {
         final profile = UserProfile.fromMap(data);
-        await OfflineRepository().saveProfileCache(profile);
+        await offline.saveProfileCache(profile);
         return profile;
       }
 
       final created = await _createMissingProfile(user);
       if (created != null) {
-        await OfflineRepository().saveProfileCache(created);
+        await offline.saveProfileCache(created);
         return created;
       }
 
-      return await OfflineRepository().getProfileCache(user.id);
-    } catch (_) {
-      return await OfflineRepository().getProfileCache(user.id);
+      return null;
+    } on PostgrestException catch (error) {
+      if (!await ConnectivityService().isOnline()) {
+        return await offline.getProfileCache(user.id);
+      }
+
+      final code = error.code == null ? '' : ' (' + error.code! + ')';
+      throw StateError(
+        'Impossible de charger le profil Fise School' + code +
+        ' : ' + error.message,
+      );
     }
   }
 
   Future<UserProfile?> _createMissingProfile(User user) async {
-    try {
-      final metadata = user.userMetadata ?? const <String, dynamic>{};
-      final appMetadata = user.appMetadata;
+    final metadata = user.userMetadata ?? const <String, dynamic>{};
+    final appMetadata = user.appMetadata;
 
-      final requestedRole = appMetadata['role'] == 'admin'
-          ? 'admin'
-          : metadata['role'] == 'teacher'
-              ? 'teacher'
-              : 'student';
+    // Never invent an administrator profile from client metadata.
+    final requestedRole = appMetadata['role'] == 'admin'
+        ? 'admin'
+        : metadata['role'] == 'teacher'
+            ? 'teacher'
+            : 'student';
 
-      final profile = UserProfile(
-        id: user.id,
-        firstName: (metadata['first_name'] as String?)?.trim().isNotEmpty == true
-            ? (metadata['first_name'] as String).trim()
-            : ((user.email ?? '').split('@').first.isNotEmpty
-                ? (user.email ?? '').split('@').first
-                : 'Utilisateur'),
-        lastName: (metadata['last_name'] as String?)?.trim().isNotEmpty == true
-            ? (metadata['last_name'] as String).trim()
-            : 'Fise',
-        email: user.email,
-        role: requestedRole,
-        preferredLanguage:
-            metadata['preferred_language'] == 'en' ? 'en' : 'fr',
-        subsystem: metadata['subsystem'] as String?,
-        sector: metadata['sector'] as String?,
-        examLevelId: metadata['exam_level_id'] as String?,
-        examId: metadata['exam_id'] as String?,
-        seriesId: metadata['series_id'] as String?,
-        specialtyId: metadata['specialty_id'] as String?,
-        examLevel: metadata['exam_level'] as String?,
-        exam: metadata['exam'] as String?,
-        track: metadata['track'] as String?,
-        className: metadata['class_name'] as String?,
-      );
-
-      final data = await _client
-          .from('profiles')
-          .upsert(profile.toMap())
-          .select()
-          .single();
-
-      return UserProfile.fromMap(data);
-    } catch (_) {
+    if (requestedRole == 'admin') {
       return null;
     }
+
+    final profile = UserProfile(
+      id: user.id,
+      firstName: (metadata['first_name'] as String?)?.trim().isNotEmpty == true
+          ? (metadata['first_name'] as String).trim()
+          : ((user.email ?? '').split('@').first.isNotEmpty
+              ? (user.email ?? '').split('@').first
+              : 'Utilisateur'),
+      lastName: (metadata['last_name'] as String?)?.trim().isNotEmpty == true
+          ? (metadata['last_name'] as String).trim()
+          : 'Fise',
+      email: user.email,
+      role: requestedRole,
+      preferredLanguage:
+          metadata['preferred_language'] == 'en' ? 'en' : 'fr',
+      subsystem: metadata['subsystem'] as String?,
+      sector: metadata['sector'] as String?,
+      examLevelId: metadata['exam_level_id'] as String?,
+      examId: metadata['exam_id'] as String?,
+      seriesId: metadata['series_id'] as String?,
+      specialtyId: metadata['specialty_id'] as String?,
+      examLevel: metadata['exam_level'] as String?,
+      exam: metadata['exam'] as String?,
+      track: metadata['track'] as String?,
+      className: metadata['class_name'] as String?,
+    );
+
+    final data = await _client
+        .from('profiles')
+        .upsert(profile.toMap())
+        .select()
+        .single();
+
+    return UserProfile.fromMap(data);
   }
 
   Future<UserProfile> updateEditableProfile({
