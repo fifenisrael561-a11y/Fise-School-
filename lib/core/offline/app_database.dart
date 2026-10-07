@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -141,7 +142,7 @@ class AppDatabase extends _$AppDatabase {
       return Variable.withReal(value);
     }
     if (value is List<int>) {
-      return Variable.withBlob(value);
+      return Variable.withBlob(Uint8List.fromList(value));
     }
     throw ArgumentError(
       'Paramètre Drift non supporté: ${value.runtimeType}',
@@ -370,7 +371,7 @@ class AppDatabase extends _$AppDatabase {
     if (assignmentId != null) {
       params.add(assignmentId);
     }
-    return _debugSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', variables: variables);
+    return _debugSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', params: params);
   }
 
   Future<void> saveOfflineQcmQueue({required String id, required String userId, required String submissionId, required String assignmentId, required String dataJson}) async {
