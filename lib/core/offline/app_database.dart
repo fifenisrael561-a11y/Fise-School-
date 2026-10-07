@@ -124,16 +124,42 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  Variable<Object> _toSqlVariable(Object? value) {
+    if (value == null) {
+      return Variable<Object>(null);
+    }
+    if (value is String) {
+      return Variable.withString(value);
+    }
+    if (value is int) {
+      return Variable.withInt(value);
+    }
+    if (value is bool) {
+      return Variable.withBool(value);
+    }
+    if (value is double) {
+      return Variable.withReal(value);
+    }
+    if (value is List<int>) {
+      return Variable.withBlob(value);
+    }
+    throw ArgumentError(
+      'Paramètre Drift non supporté: ${value.runtimeType}',
+    );
+  }
+
   Future<List<QueryRow>> _debugSelect(
     String sql, {
-    List<Variable<Object>> variables = const [],
+    List<Object?> params = const [],
   }) async {
+    final variables = params.map(_toSqlVariable).toList(growable: false);
     try {
       return await customSelect(sql, variables: variables).get();
     } catch (error, stackTrace) {
       print('[FISE-DRIFT] SQL SELECT ERROR');
       print('[FISE-DRIFT] SQL: $sql');
-      print('[FISE-DRIFT] PARAMS: $variables');
+      print('[FISE-DRIFT] PARAMS: $params');
+      print('[FISE-DRIFT] VARIABLES: $variables');
       print('[FISE-DRIFT] ERROR: $error');
       print('[FISE-DRIFT] STACK: $stackTrace');
       rethrow;
@@ -167,12 +193,12 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<DownloadedFileRecord>> getDownloadedFiles({String? userId, String? courseId}) async {
     final where = <String>[];
-    final variables = <Variable<Object>>[];
-    if (userId != null) { where.add('user_id = ?'); variables.add(Variable.withString(userId) as Variable<Object>); }
-    if (courseId != null) { where.add('course_id = ?'); variables.add(Variable.withString(courseId) as Variable<Object>); }
+    final params = <Object?>[];
+    if (userId != null) { where.add('user_id = ?'); params.add(userId); }
+    if (courseId != null) { where.add('course_id = ?'); params.add(courseId); }
     final rows = await _debugSelect(
       'SELECT * FROM downloaded_files${where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}'} ORDER BY COALESCE(last_opened_at, downloaded_at) ASC',
-      variables: variables,
+      params: params,
     );
     return rows.map(DownloadedFileRecord.fromRow).toList(growable: false);
   }
@@ -180,7 +206,7 @@ class AppDatabase extends _$AppDatabase {
   Future<DownloadedFileRecord?> getDownloadedFile(String resourceId, String userId) async {
     final rows = await _debugSelect(
       'SELECT * FROM downloaded_files WHERE resource_id = ? AND user_id = ? LIMIT 1',
-      variables: [Variable.withString(resourceId) as Variable<Object>, Variable.withString(userId) as Variable<Object>],
+      params: [resourceId, userId],
     );
     return rows.isEmpty ? null : DownloadedFileRecord.fromRow(rows.first);
   }
@@ -211,7 +237,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<int> downloadedFilesSize(String userId) async {
-    final rows = await _debugSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", variables: [Variable.withString(userId) as Variable<Object>]);
+    final rows = await _debugSelect("SELECT COALESCE(SUM(size_bytes),0) AS total FROM downloaded_files WHERE user_id = ? AND status = 'done'", params: [userId]);
     return rows.first.read<int>('total');
   }
 
@@ -247,7 +273,7 @@ class AppDatabase extends _$AppDatabase {
   Future<String?> getCachedProfile(String userId) async {
     final rows = await _debugSelect(
       'SELECT data_json FROM cached_profiles WHERE user_id = ? LIMIT 1',
-      variables: [Variable.withString(userId) as Variable<Object>],
+      params: [userId],
     );
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
@@ -267,7 +293,7 @@ class AppDatabase extends _$AppDatabase {
   Future<String?> getCachedClassSubjects(String userId) async {
     final rows = await _debugSelect(
       'SELECT data_json FROM cached_class_subjects WHERE user_id = ? LIMIT 1',
-      variables: [Variable.withString(userId) as Variable<Object>],
+      params: [userId],
     );
     return rows.isEmpty ? null : rows.first.read<String>('data_json');
   }
@@ -340,9 +366,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<QueryRow>> getOfflineQcm(String userId, String kind, {String? assignmentId}) async {
     final filter = assignmentId == null ? '' : ' AND assignment_id = ?';
-    final variables = <Variable<Object>>[Variable.withString(userId) as Variable<Object>, Variable.withString(kind) as Variable<Object>];
+    final params = <Object?>[userId, kind];
     if (assignmentId != null) {
-      variables.add(Variable.withString(assignmentId) as Variable<Object>);
+      params.add(assignmentId);
     }
     return _debugSelect('SELECT * FROM offline_qcm WHERE user_id = ? AND kind = ?$filter ORDER BY updated_at', variables: variables);
   }
@@ -354,7 +380,7 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => _debugSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', variables: [Variable.withString(userId) as Variable<Object>]);
+  Future<List<QueryRow>> getOfflineQcmQueue(String userId) => _debugSelect('SELECT * FROM offline_qcm_queue WHERE user_id = ? ORDER BY queued_at', params: [userId]);
 
   Future<void> deleteOfflineQcmQueue(String id, String userId) => _debugStatement('DELETE FROM offline_qcm_queue WHERE id = ? AND user_id = ?', [id, userId]);
 
@@ -368,7 +394,7 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> getSmartLesson(String userId, String id) async {
     final rows = await _debugSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? AND id = ? LIMIT 1',
-      variables: [Variable.withString(userId) as Variable<Object>, Variable.withString(id) as Variable<Object>],
+      params: [userId, id],
     );
     return rows.isEmpty ? null : rows.first;
   }
@@ -376,14 +402,14 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> latestSmartLesson(String userId) async {
     final rows = await _debugSelect(
       'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC LIMIT 1',
-      variables: [Variable.withString(userId) as Variable<Object>],
+      params: [userId],
     );
     return rows.isEmpty ? null : rows.first;
   }
 
   Future<List<QueryRow>> getSmartLessons(String userId) => _debugSelect(
     'SELECT * FROM smart_lessons_cache WHERE user_id = ? ORDER BY cached_at DESC',
-    variables: [Variable.withString(userId) as Variable<Object>],
+    params: [userId],
   );
 
   Future<void> queueSmartExercise({required String id, required String userId, required String lessonId, required String answersJson}) async {
@@ -395,7 +421,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<QueryRow>> getSmartExerciseQueue(String userId) => _debugSelect(
     'SELECT * FROM smart_exercise_queue WHERE user_id = ? ORDER BY queued_at',
-    variables: [Variable.withString(userId) as Variable<Object>],
+    params: [userId],
   );
 
   Future<void> deleteSmartExerciseQueue(String id, String userId) => _debugStatement(
@@ -413,7 +439,7 @@ class AppDatabase extends _$AppDatabase {
   Future<QueryRow?> getSmartExerciseResult(String userId, String lessonId) async {
     final rows = await _debugSelect(
       'SELECT * FROM smart_exercise_results WHERE user_id = ? AND lesson_id = ? ORDER BY saved_at DESC LIMIT 1',
-      variables: [Variable.withString(userId) as Variable<Object>, Variable.withString(lessonId) as Variable<Object>],
+      params: [userId, lessonId],
     );
     return rows.isEmpty ? null : rows.first;
   }
